@@ -1,0 +1,3937 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="light" data-map-style="osm">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>IGC Flug-Heatmap &amp; Zeitraffer-Viewer</title>
+
+  <!-- Inter Font für klare Apple-ähnliche Typografie -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Leaflet 1.9.4 CSS & JS über CDN (100 % API-Key-frei) -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+
+  <style>
+    /* ==========================================================================
+       1. OPTICAL LIQUID GLASS DESIGN SYSTEM (visionOS / iOS INSPIRIERT)
+          - Ultra-transparente Glasplatten: blur(18px) saturate(210%) contrast(112%)
+          - 1.5px geschliffene Kristallkante (::before) + zweischichtige Reflexion (::after)
+          - Entsättigtes Silberweiß- & Eisblau-Spektrum (ohne Punktraster/Eck-Elemente)
+       ========================================================================== */
+    :root,
+    html[data-theme="light"] {
+      --lg-bg: rgba(255, 255, 255, 0.22);
+      --lg-bg-elevated: rgba(255, 255, 255, 0.34);
+      --lg-blur: blur(18px) saturate(210%) contrast(112%);
+
+      --lg-hairline: rgba(255, 255, 255, 0.58);
+      --lg-shadow:
+        0 14px 36px rgba(15, 23, 42, 0.18),
+        0 3px 8px rgba(15, 23, 42, 0.08),
+        inset 0 1.5px 1px rgba(255, 255, 255, 0.96),
+        inset 0 -1px 1px rgba(186, 210, 238, 0.62),
+        inset 0 0 18px rgba(255, 255, 255, 0.24);
+
+      --lg-shadow-elevated:
+        0 24px 56px rgba(15, 23, 42, 0.24),
+        0 6px 14px rgba(15, 23, 42, 0.10),
+        inset 0 1.5px 1px rgba(255, 255, 255, 0.99),
+        inset 0 -1px 1px rgba(186, 210, 238, 0.68),
+        inset 0 0 22px rgba(255, 255, 255, 0.30);
+
+      /* Geschliffene Kristallkante (entsättigtes Silberweiß & Eisblau) */
+      --edge-c1: rgba(255, 255, 255, 0.98);
+      --edge-c2: rgba(202, 224, 248, 0.68);
+      --edge-c3: rgba(232, 240, 248, 0.32);
+
+      /* Zweischichtige Lichtklinge & Kaustik-Welle */
+      --sheen-blade: rgba(255, 255, 255, 0.92);
+      --sheen-ice: rgba(204, 226, 250, 0.54);
+      --sheen-caustic: rgba(255, 255, 255, 0.42);
+      --sheen-pearl: rgba(228, 238, 250, 0.28);
+
+      --lg-pill-bg: rgba(255, 255, 255, 0.30);
+      --lg-pill-hover: rgba(255, 255, 255, 0.50);
+      --lg-seg-track: rgba(255, 255, 255, 0.24);
+      --lg-seg-thumb: rgba(255, 255, 255, 0.90);
+      --lg-seg-thumb-shadow:
+        0 3px 10px rgba(15, 23, 42, 0.16),
+        inset 0 1.5px 0.5px rgba(255, 255, 255, 1);
+
+      --text-primary: #0f172a;
+      --text-secondary: #334155;
+      --text-halo:
+        0 0 8px rgba(255, 255, 255, 0.94),
+        0 1px 2px rgba(255, 255, 255, 0.98);
+
+      --legend-text: #0f172a;
+      --legend-halo:
+        0 0 8px rgba(255, 255, 255, 0.97),
+        0 1px 2px rgba(255, 255, 255, 1);
+
+      --accent: #007AFF;
+      --accent-soft: rgba(0, 122, 255, 0.16);
+      --accent-border: rgba(0, 122, 255, 0.44);
+
+      --danger: #DC2626;
+      --danger-soft: rgba(220, 38, 38, 0.16);
+
+      --row-hover: rgba(255, 255, 255, 0.34);
+      --row-active-day: rgba(0, 122, 255, 0.16);
+      --scrubber-track: rgba(15, 23, 42, 0.24);
+      --map-backdrop: #e2e8f0;
+    }
+
+    html[data-theme="dark"] {
+      --lg-bg: rgba(12, 18, 30, 0.40);
+      --lg-bg-elevated: rgba(12, 18, 30, 0.56);
+      --lg-blur: blur(18px) saturate(210%) contrast(112%);
+
+      --lg-hairline: rgba(216, 232, 252, 0.26);
+      --lg-shadow:
+        0 16px 40px rgba(0, 0, 0, 0.64),
+        0 3px 10px rgba(0, 0, 0, 0.38),
+        inset 0 1.5px 1px rgba(235, 245, 255, 0.68),
+        inset 0 -1px 1px rgba(138, 168, 206, 0.34),
+        inset 0 0 20px rgba(180, 210, 248, 0.10);
+
+      --lg-shadow-elevated:
+        0 26px 60px rgba(0, 0, 0, 0.78),
+        0 6px 16px rgba(0, 0, 0, 0.48),
+        inset 0 1.5px 1px rgba(240, 248, 255, 0.76),
+        inset 0 -1px 1px rgba(138, 168, 206, 0.40),
+        inset 0 0 24px rgba(180, 210, 248, 0.14);
+
+      --edge-c1: rgba(240, 248, 255, 0.74);
+      --edge-c2: rgba(172, 200, 232, 0.40);
+      --edge-c3: rgba(255, 255, 255, 0.18);
+
+      --sheen-blade: rgba(238, 247, 255, 0.60);
+      --sheen-ice: rgba(172, 202, 236, 0.32);
+      --sheen-caustic: rgba(215, 234, 255, 0.22);
+      --sheen-pearl: rgba(255, 255, 255, 0.14);
+
+      --lg-pill-bg: rgba(255, 255, 255, 0.11);
+      --lg-pill-hover: rgba(255, 255, 255, 0.20);
+      --lg-seg-track: rgba(255, 255, 255, 0.09);
+      --lg-seg-thumb: rgba(226, 238, 252, 0.30);
+      --lg-seg-thumb-shadow:
+        0 3px 10px rgba(0, 0, 0, 0.50),
+        inset 0 1.5px 0.5px rgba(255, 255, 255, 0.48);
+
+      --text-primary: #F8FAFC;
+      --text-secondary: #CBD5E1;
+      --text-halo:
+        0 0 8px rgba(8, 12, 20, 0.92),
+        0 1px 2px rgba(8, 12, 20, 0.98);
+
+      --legend-text: #F8FAFC;
+      --legend-halo:
+        0 0 8px rgba(8, 12, 20, 0.95),
+        0 1px 2px rgba(8, 12, 20, 1);
+
+      --accent: #0A84FF;
+      --accent-soft: rgba(10, 132, 255, 0.26);
+      --accent-border: rgba(160, 208, 255, 0.48);
+
+      --danger: #FF453A;
+      --danger-soft: rgba(255, 69, 58, 0.25);
+
+      --row-hover: rgba(255, 255, 255, 0.12);
+      --row-active-day: rgba(10, 132, 255, 0.24);
+      --scrubber-track: rgba(255, 255, 255, 0.26);
+      --map-backdrop: #0b101b;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", system-ui, sans-serif;
+      background-color: var(--map-backdrop);
+      color: var(--text-primary);
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+    }
+
+    button, input {
+      font-family: inherit;
+      color: inherit;
+    }
+
+    .tabular {
+      font-variant-numeric: tabular-nums;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* ==========================================================================
+       2. VOLLBILD-KARTE, OSM MIT PLASTISCHEM 3D-RELIEF-SCHATTEN & DARK-MODE FILTER
+       ========================================================================== */
+    #map {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100dvh;
+      z-index: 1;
+      background-color: var(--map-backdrop);
+      touch-action: none;
+    }
+
+    .leaflet-tile-pane,
+    .leaflet-osm-relief-pane {
+      transition: filter 0.42s ease, opacity 0.42s ease;
+    }
+
+    /* Nicht-interaktiver 3D-Relief-Schummerungs-Pane über OSM:
+       Flache Täler bleiben neutral, Berghänge werfen plastische Schatten */
+    .leaflet-osm-relief-pane {
+      pointer-events: none !important;
+      mix-blend-mode: multiply;
+      opacity: 0.78;
+      filter: grayscale(100%) brightness(0.80) contrast(2.85);
+    }
+
+    html[data-theme="dark"] .leaflet-osm-relief-pane {
+      mix-blend-mode: hard-light;
+      opacity: 0.56;
+      filter: grayscale(100%) brightness(0.62) contrast(2.45);
+    }
+
+    html[data-theme="dark"] .osm-base-tiles {
+      filter: invert(100%) hue-rotate(180deg) brightness(90%) contrast(95%) saturate(85%);
+    }
+
+    html[data-theme="dark"] .topo-base-tiles {
+      filter: invert(100%) hue-rotate(180deg) brightness(88%) contrast(96%) saturate(78%);
+    }
+
+    html[data-theme="dark"] .relief-base-tiles {
+      filter: invert(92%) hue-rotate(180deg) brightness(72%) contrast(125%) saturate(55%);
+    }
+
+    html[data-theme="dark"] .relief-label-tiles {
+      filter: invert(100%) hue-rotate(180deg) brightness(118%) contrast(112%);
+    }
+
+    .leaflet-control-attribution {
+      background: rgba(255, 255, 255, 0.48) !important;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-radius: 8px 0 0 0;
+      font-size: 9.5px !important;
+      color: #334155 !important;
+      padding: 1px 6px !important;
+    }
+
+    html[data-theme="dark"] .leaflet-control-attribution {
+      background: rgba(15, 23, 42, 0.58) !important;
+      color: #94a3b8 !important;
+    }
+
+    html[data-theme="dark"] .leaflet-control-attribution a {
+      color: #cbd5e1 !important;
+    }
+
+    /* ==========================================================================
+       3. SCHLICHTES, MODERNES OPTICAL LIQUID GLASS
+          - ::before -> 1.5px geschliffene Kristallkante (mask-composite: exclude)
+          - ::after  -> Zweischichtige animierte Lichtklinge & Kaustik-Welle
+       ========================================================================== */
+    .liquid-glass {
+      --refl-x: 32%;
+      --refl-y: 24%;
+      --refl-angle: 124deg;
+      --edge-angle: 132deg;
+      --sheen-boost: 0;
+
+      position: relative;
+      background-color: var(--lg-bg);
+      backdrop-filter: var(--lg-blur);
+      -webkit-backdrop-filter: var(--lg-blur);
+      box-shadow: var(--lg-shadow);
+      transition:
+        background-color 0.36s ease,
+        box-shadow 0.36s ease,
+        color 0.3s ease;
+    }
+
+    .liquid-glass-elevated {
+      background-color: var(--lg-bg-elevated);
+      box-shadow: var(--lg-shadow-elevated);
+      transition:
+        background-color 0.36s ease,
+        box-shadow 0.36s ease,
+        opacity 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+        transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .liquid-glass > * {
+      position: relative;
+      z-index: 2;
+    }
+
+    /* ::before -> Geschliffene 1.5px Kristallkante */
+    .liquid-glass::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      padding: 1.5px;
+      pointer-events: none;
+      z-index: 3;
+      background: conic-gradient(
+        from var(--edge-angle) at 50% 50%,
+        var(--edge-c1) 0deg,
+        var(--edge-c2) 52deg,
+        var(--edge-c3) 124deg,
+        var(--edge-c1) 182deg,
+        var(--edge-c2) 238deg,
+        var(--edge-c3) 310deg,
+        var(--edge-c1) 360deg
+      );
+      -webkit-mask:
+        linear-gradient(#fff 0 0) content-box,
+        linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask:
+        linear-gradient(#fff 0 0) content-box,
+        linear-gradient(#fff 0 0);
+      mask-composite: exclude;
+    }
+
+    /* ::after -> Zweischichtige Lichtklinge + Kaustik-Welle */
+    .liquid-glass::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      pointer-events: none;
+      z-index: 1;
+      opacity: calc(0.76 + var(--sheen-boost) * 0.24);
+      background-image:
+        linear-gradient(
+          var(--refl-angle),
+          transparent 16%,
+          var(--sheen-pearl) 34%,
+          var(--sheen-blade) 48.5%,
+          var(--sheen-ice) 56%,
+          transparent 76%
+        ),
+        radial-gradient(
+          ellipse 195px 125px at var(--refl-x) var(--refl-y),
+          var(--sheen-blade) 0%,
+          var(--sheen-ice) 38%,
+          transparent 74%
+        ),
+        radial-gradient(
+          circle 135px at calc(100% - var(--refl-x)) calc(100% - var(--refl-y)),
+          var(--sheen-caustic) 0%,
+          transparent 70%
+        );
+      background-size: 240% 240%, 100% 100%, 100% 100%;
+      background-position: var(--refl-x) var(--refl-y), 0 0, 0 0;
+    }
+
+    /* ==========================================================================
+       4. TOP-BAR (3 ELEMENTE, RESPONSIVE AB 360px OHNE ABSCHNEIDEN)
+       ========================================================================== */
+    .top-bar-wrapper {
+      position: fixed;
+      top: max(12px, env(safe-area-inset-top));
+      left: 0;
+      right: 0;
+      z-index: 1000;
+      display: flex;
+      justify-content: center;
+      padding: 0 8px;
+      pointer-events: none;
+    }
+
+    .top-glass-bar {
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      padding: 4px 5px;
+      border-radius: 21px;
+      max-width: calc(100vw - 16px);
+    }
+
+    .lg-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      height: 34px;
+      padding: 0 11px;
+      border-radius: 15px;
+      border: 1px solid var(--lg-hairline);
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      text-shadow: var(--text-halo);
+      transition:
+        transform 0.12s cubic-bezier(0.22, 1, 0.36, 1),
+        background-color 0.18s ease,
+        border-color 0.18s ease;
+    }
+
+    .lg-btn:active:not(:disabled) {
+      transform: scale(0.95);
+    }
+
+    .lg-btn:disabled {
+      opacity: 0.42;
+      cursor: not-allowed;
+    }
+
+    .lg-btn-primary {
+      background: rgba(0, 122, 255, 0.88);
+      color: #ffffff;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.28);
+      border-color: rgba(255, 255, 255, 0.48);
+      box-shadow:
+        0 2px 10px rgba(0, 122, 255, 0.28),
+        inset 0 1px 0 rgba(255, 255, 255, 0.52);
+    }
+
+    .lg-btn-primary:hover:not(:disabled) {
+      background: rgba(0, 122, 255, 0.96);
+    }
+
+    .lg-btn-glass {
+      background: var(--lg-pill-bg);
+      color: var(--text-primary);
+    }
+
+    .lg-btn-glass:hover:not(:disabled) {
+      background: var(--lg-pill-hover);
+    }
+
+    .lg-btn-glass.is-active {
+      background: var(--accent-soft);
+      border-color: var(--accent-border);
+    }
+
+    .flights-count-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 20px;
+      padding: 0 6px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      background: var(--accent-soft);
+      color: var(--text-primary);
+      white-space: nowrap;
+      flex-shrink: 0;
+      font-variant-numeric: tabular-nums;
+      text-shadow: var(--text-halo);
+    }
+
+    /* iOS Segmented Control */
+    .ios-segmented {
+      position: relative;
+      display: inline-grid;
+      grid-template-columns: 1fr 1fr;
+      align-items: center;
+      height: 34px;
+      padding: 2px;
+      border-radius: 15px;
+      background: var(--lg-seg-track);
+      border: 1px solid var(--lg-hairline);
+      flex-shrink: 0;
+    }
+
+    .ios-segmented-thumb {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: calc(50% - 2px);
+      height: calc(100% - 4px);
+      border-radius: 12px;
+      background: var(--lg-seg-thumb);
+      box-shadow: var(--lg-seg-thumb-shadow);
+      transition: transform 0.24s cubic-bezier(0.25, 1, 0.35, 1), background-color 0.25s ease;
+      pointer-events: none;
+    }
+
+    .ios-segmented[data-index="1"] .ios-segmented-thumb {
+      transform: translateX(100%);
+    }
+
+    .ios-seg-option {
+      position: relative;
+      z-index: 1;
+      border: none;
+      background: transparent;
+      height: 100%;
+      padding: 0 11px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-shadow: var(--text-halo);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: color 0.18s ease;
+    }
+
+    .ios-seg-option.active {
+      color: var(--text-primary);
+      font-weight: 700;
+    }
+
+    /* ==========================================================================
+       5. SUB-BAR (KARTENAUSWAHL LINKS + PHYSISCHER TAG/NACHT-SCHALTER RECHTS)
+          + HINTERGRUNDFREIE MIKRO-LEGENDE DIREKT DARUNTER
+       ========================================================================== */
+    .sub-controls-row {
+      position: fixed;
+      top: calc(max(12px, env(safe-area-inset-top)) + 50px);
+      left: 10px;
+      right: 10px;
+      z-index: 920;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .map-style-pill {
+      pointer-events: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      padding: 3px;
+      border-radius: 17px;
+      flex-shrink: 0;
+    }
+
+    .map-style-btn {
+      border: none;
+      background: transparent;
+      height: 28px;
+      padding: 0 10px;
+      border-radius: 13px;
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-shadow: var(--text-halo);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+    }
+
+    .map-style-btn:hover {
+      color: var(--text-primary);
+      background: var(--lg-pill-bg);
+    }
+
+    .map-style-btn.active {
+      background: var(--lg-seg-thumb);
+      color: var(--text-primary);
+      font-weight: 700;
+      box-shadow: var(--lg-seg-thumb-shadow);
+    }
+
+    /* Physischer iOS Tag/Nacht-Glas-Schalter (68px x 34px) */
+    .theme-glass-switch {
+      pointer-events: auto;
+      width: 68px;
+      height: 34px;
+      border-radius: 999px;
+      border: none;
+      padding: 3px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    .theme-glass-switch:active .theme-switch-thumb {
+      width: 31px;
+    }
+
+    html[data-theme="dark"] .theme-glass-switch:active .theme-switch-thumb {
+      transform: translateX(31px);
+    }
+
+    .theme-switch-track-icons {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 6.5px;
+      pointer-events: none;
+      color: var(--text-secondary);
+      opacity: 0.78;
+    }
+
+    .theme-switch-thumb.liquid-glass {
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      z-index: 4;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: var(--lg-seg-thumb);
+      box-shadow:
+        0 3px 10px rgba(15, 23, 42, 0.25),
+        inset 0 1.5px 1px rgba(255, 255, 255, 0.98),
+        inset 0 -1px 1px rgba(186, 206, 232, 0.58);
+      color: var(--text-primary);
+      transition:
+        transform 0.36s cubic-bezier(0.34, 1.42, 0.64, 1),
+        width 0.16s ease,
+        background-color 0.3s ease,
+        box-shadow 0.3s ease;
+      pointer-events: none;
+    }
+
+    html[data-theme="dark"] .theme-switch-thumb.liquid-glass {
+      transform: translateX(34px);
+      background-color: rgba(226, 238, 252, 0.32);
+      box-shadow:
+        0 4px 12px rgba(0, 0, 0, 0.56),
+        inset 0 1.5px 1px rgba(255, 255, 255, 0.72),
+        inset 0 -1px 1px rgba(148, 172, 204, 0.36);
+    }
+
+    /* Hintergrundfreie Mikro-Legende direkt unter der Sub-Bar */
+    .micro-legend-row {
+      position: fixed;
+      top: calc(max(12px, env(safe-area-inset-top)) + 90px);
+      left: 0;
+      right: 0;
+      z-index: 910;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      pointer-events: none;
+    }
+
+    .micro-legend-lbl {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      color: var(--legend-text);
+      text-shadow: var(--legend-halo);
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .micro-legend-bar {
+      width: 82px;
+      height: 5.5px;
+      border-radius: 999px;
+      box-shadow:
+        0 1px 5px rgba(0, 0, 0, 0.48),
+        0 0 0 0.7px rgba(255, 255, 255, 0.72);
+      flex-shrink: 0;
+    }
+
+    /* Hochgesättigte 7-Stufen Heatmap-Farbskala */
+    .grad-heatmap {
+      background: linear-gradient(
+        90deg,
+        rgb(0, 102, 255) 0%,
+        rgb(0, 225, 255) 18%,
+        rgb(0, 235, 95) 36%,
+        rgb(255, 230, 0) 55%,
+        rgb(255, 115, 0) 74%,
+        rgb(245, 15, 45) 90%,
+        rgb(255, 70, 200) 96%,
+        rgb(255, 215, 248) 100%
+      );
+    }
+
+    /* Kontraststarke 7-Stufen Steigraten-Skala (-2.5 m/s bis +3.5 m/s) */
+    .grad-vario {
+      background: linear-gradient(
+        90deg,
+        #5b00ff 0%,
+        #0066ff 20%,
+        #00d8ff 35%,
+        #00e664 43%,
+        #d4ff00 60%,
+        #ff7b00 78%,
+        #ff0055 100%
+      );
+    }
+
+    /* ==========================================================================
+       6. EIN-/AUSKLAPPBARES "FLÜGE" GLAS-POPOVER (INKL. ZENTRIEREN-BUTTON)
+       ========================================================================== */
+    .flights-popover {
+      position: fixed;
+      top: calc(max(12px, env(safe-area-inset-top)) + 112px);
+      right: 10px;
+      z-index: 1050;
+      width: min(430px, calc(100vw - 20px));
+      max-height: min(56vh, 430px);
+      border-radius: 24px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transform-origin: top right;
+      pointer-events: auto;
+    }
+
+    .flights-popover.popover-hidden {
+      opacity: 0;
+      transform: translateY(-8px) scale(0.96);
+      pointer-events: none;
+    }
+
+    .popover-header {
+      padding: 12px 14px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      border-bottom: 1px solid var(--lg-hairline);
+      flex-shrink: 0;
+    }
+
+    .popover-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .popover-title {
+      margin: 0;
+      font-size: 15.5px;
+      font-weight: 700;
+      letter-spacing: -0.015em;
+      text-shadow: var(--text-halo);
+    }
+
+    .popover-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .popover-center-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      height: 28px;
+      padding: 0 9px;
+      border-radius: 999px;
+      border: 1px solid var(--lg-hairline);
+      background: var(--lg-pill-bg);
+      color: var(--text-primary);
+      text-shadow: var(--text-halo);
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background-color 0.15s ease, transform 0.12s ease;
+    }
+
+    .popover-center-btn:hover:not(:disabled) {
+      background: var(--lg-pill-hover);
+    }
+
+    .popover-center-btn:active:not(:disabled) {
+      transform: scale(0.95);
+    }
+
+    .popover-center-btn:disabled {
+      opacity: 0.42;
+      cursor: not-allowed;
+    }
+
+    .ios-close-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      border: 1px solid var(--lg-hairline);
+      background: var(--lg-pill-bg);
+      color: var(--text-primary);
+      text-shadow: var(--text-halo);
+      font-size: 16px;
+      font-weight: 600;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background-color 0.15s ease;
+    }
+
+    .ios-close-btn:hover {
+      background: var(--lg-pill-hover);
+    }
+
+    .popover-toolbar {
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      border-bottom: 1px solid var(--lg-hairline);
+      background: rgba(255, 255, 255, 0.04);
+      flex-shrink: 0;
+      font-size: 12px;
+    }
+
+    .master-check-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-weight: 700;
+      color: var(--text-primary);
+      text-shadow: var(--text-halo);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .popover-actions-right {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .popover-total-dist {
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-shadow: var(--text-halo);
+      white-space: nowrap;
+    }
+
+    .btn-pill-mini {
+      border: 1px solid var(--lg-hairline);
+      background: var(--lg-pill-bg);
+      color: var(--text-primary);
+      text-shadow: var(--text-halo);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 8px;
+      border-radius: 9px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background-color 0.15s ease;
+    }
+
+    .btn-pill-mini:hover {
+      background: var(--lg-pill-hover);
+    }
+
+    .btn-pill-danger {
+      border: 1px solid rgba(220, 38, 38, 0.30);
+      background: var(--danger-soft);
+      color: var(--danger);
+      text-shadow: var(--text-halo);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 8px;
+      border-radius: 9px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .popover-table-scroll {
+      overflow-y: auto;
+      overflow-x: hidden;
+      flex: 1;
+      overscroll-behavior: contain;
+    }
+
+    .popover-table-scroll::-webkit-scrollbar {
+      width: 5px;
+    }
+
+    .popover-table-scroll::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.42);
+      border-radius: 999px;
+    }
+
+    table.ios-flights-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    table.ios-flights-table th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: var(--lg-pill-bg);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      padding: 8px 9px;
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-secondary);
+      text-shadow: var(--text-halo);
+      border-bottom: 1px solid var(--lg-hairline);
+    }
+
+    table.ios-flights-table th.sortable {
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    table.ios-flights-table td {
+      padding: 8px 9px;
+      font-size: 12.5px;
+      border-bottom: 1px solid var(--lg-hairline);
+      vertical-align: middle;
+      text-shadow: var(--text-halo);
+    }
+
+    table.ios-flights-table tbody tr {
+      transition: background-color 0.14s ease, opacity 0.18s ease;
+    }
+
+    table.ios-flights-table tbody tr:hover {
+      background: var(--row-hover);
+    }
+
+    table.ios-flights-table tbody tr.is-unchecked {
+      opacity: 0.44;
+    }
+
+    table.ios-flights-table tbody tr.is-active-day {
+      background: var(--row-active-day);
+    }
+
+    .col-chk {
+      width: 36px;
+      padding-left: 14px !important;
+    }
+
+    .col-dist {
+      text-align: right;
+      white-space: nowrap;
+      font-weight: 700;
+    }
+
+    .col-del {
+      width: 34px;
+      text-align: right;
+      padding-right: 11px !important;
+    }
+
+    input[type="checkbox"].ios-checkbox {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 17px;
+      height: 17px;
+      border-radius: 5.5px;
+      border: 1.5px solid var(--text-secondary);
+      background: rgba(255, 255, 255, 0.24);
+      display: inline-grid;
+      place-content: center;
+      cursor: pointer;
+      vertical-align: middle;
+      transition: background-color 0.15s ease, border-color 0.15s ease;
+    }
+
+    input[type="checkbox"].ios-checkbox:checked,
+    input[type="checkbox"].ios-checkbox:indeterminate {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    input[type="checkbox"].ios-checkbox:checked::before {
+      content: "";
+      width: 9px;
+      height: 5.5px;
+      border-left: 2px solid #ffffff;
+      border-bottom: 2px solid #ffffff;
+      transform: rotate(-45deg) translate(0.5px, -1px);
+    }
+
+    input[type="checkbox"].ios-checkbox:indeterminate::before {
+      content: "";
+      width: 8px;
+      height: 2px;
+      background: #ffffff;
+      border-radius: 2px;
+    }
+
+    .flight-site-cell {
+      max-width: 175px;
+    }
+
+    .flight-site-title {
+      font-weight: 700;
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .flight-site-sub {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-top: 1px;
+    }
+
+    .day-match-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      flex-shrink: 0;
+    }
+
+    .row-del-btn {
+      width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 15px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background-color 0.14s ease, color 0.14s ease;
+    }
+
+    .row-del-btn:hover {
+      background: var(--danger-soft);
+      color: var(--danger);
+    }
+
+    /* ==========================================================================
+       7. SCHWEBENDES ZEITRAFFER-DOCK UNTEN
+       ========================================================================== */
+    .timelapse-dock-wrapper {
+      position: fixed;
+      bottom: max(14px, env(safe-area-inset-bottom));
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 980;
+      width: min(740px, calc(100vw - 20px));
+      pointer-events: none;
+    }
+
+    .timelapse-dock {
+      pointer-events: auto;
+      border-radius: 24px;
+      padding: 11px 15px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .dock-top-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 7px;
+    }
+
+    .dock-controls-left {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .play-circle-btn {
+      height: 32px;
+      padding: 0 13px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.45);
+      background: rgba(0, 122, 255, 0.88);
+      color: #ffffff;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.28);
+      font-size: 12.5px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      cursor: pointer;
+      box-shadow:
+        0 2px 10px rgba(0, 122, 255, 0.28),
+        inset 0 1px 0 rgba(255, 255, 255, 0.48);
+      transition: transform 0.12s ease, background-color 0.16s ease;
+    }
+
+    .play-circle-btn:hover {
+      background: rgba(0, 122, 255, 0.96);
+    }
+
+    .play-circle-btn:active:not(:disabled) {
+      transform: scale(0.95);
+    }
+
+    .dock-segmented {
+      height: 32px;
+      border-radius: 13px;
+    }
+
+    .dock-segmented .ios-seg-option {
+      font-size: 11.5px;
+      padding: 0 9px;
+    }
+
+    .speed-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 32px;
+      padding: 0 9px;
+      border-radius: 13px;
+      border: 1px solid var(--lg-hairline);
+      background: var(--lg-pill-bg);
+      font-size: 11.5px;
+      font-weight: 700;
+      color: var(--text-primary);
+      text-shadow: var(--text-halo);
+      cursor: pointer;
+      transition: background-color 0.15s ease;
+    }
+
+    .speed-pill:hover {
+      background: var(--lg-pill-hover);
+    }
+
+    .dock-status-right {
+      display: flex;
+      align-items: center;
+      margin-left: auto;
+    }
+
+    .dock-date-readout {
+      text-align: right;
+    }
+
+    .dock-date-main {
+      font-size: 13.5px;
+      font-weight: 700;
+      letter-spacing: -0.015em;
+      color: var(--text-primary);
+      text-shadow: var(--text-halo);
+      line-height: 1.15;
+    }
+
+    .dock-date-sub {
+      font-size: 10.5px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-shadow: var(--text-halo);
+    }
+
+    .scrubber-container {
+      display: flex;
+      align-items: center;
+    }
+
+    input[type="range"].ios-scrubber {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 5px;
+      border-radius: 999px;
+      background: var(--scrubber-track);
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"].ios-scrubber::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: 1px solid rgba(15, 23, 42, 0.16);
+      box-shadow: 0 2px 7px rgba(0, 0, 0, 0.28);
+      cursor: pointer;
+      transition: transform 0.12s ease;
+    }
+
+    input[type="range"].ios-scrubber::-webkit-slider-thumb:hover {
+      transform: scale(1.14);
+    }
+
+    input[type="range"].ios-scrubber::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: 1px solid rgba(15, 23, 42, 0.16);
+      box-shadow: 0 2px 7px rgba(0, 0, 0, 0.28);
+      cursor: pointer;
+    }
+
+    .day-chips-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 1px;
+      scrollbar-width: none;
+    }
+
+    .day-chips-row::-webkit-scrollbar {
+      display: none;
+    }
+
+    .day-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      height: 26px;
+      padding: 0 10px;
+      border-radius: 999px;
+      border: 1px solid var(--lg-hairline);
+      background: var(--lg-pill-bg);
+      color: var(--text-primary);
+      text-shadow: var(--text-halo);
+      font-size: 11.5px;
+      font-weight: 600;
+      white-space: nowrap;
+      flex-shrink: 0;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .day-pill:hover {
+      background: var(--lg-pill-hover);
+    }
+
+    .day-pill.is-past {
+      border-color: var(--accent-border);
+    }
+
+    .day-pill.is-active {
+      background: var(--accent);
+      color: #ffffff;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+      border-color: rgba(255, 255, 255, 0.45);
+      box-shadow: 0 2px 8px rgba(0, 122, 255, 0.34);
+    }
+
+    .day-pill-count {
+      font-size: 10.5px;
+      font-weight: 700;
+      opacity: 0.9;
+    }
+
+    /* ==========================================================================
+       8. EMPTY STATE, HOVER-TOOLTIP, DRAG & DROP & TOASTS
+       ========================================================================== */
+    .empty-glass-card {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 950;
+      width: min(360px, calc(100vw - 28px));
+      padding: 24px 20px;
+      border-radius: 26px;
+      text-align: center;
+      pointer-events: auto;
+    }
+
+    .empty-icon-badge {
+      width: 50px;
+      height: 50px;
+      margin: 0 auto 12px;
+      border-radius: 16px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      border: 1px solid var(--accent-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .ios-track-tooltip {
+      position: fixed;
+      z-index: 1200;
+      pointer-events: none;
+      padding: 10px 13px;
+      border-radius: 18px;
+      min-width: 210px;
+      font-size: 12px;
+    }
+
+    .tt-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding-bottom: 6px;
+      margin-bottom: 6px;
+      border-bottom: 1px solid var(--lg-hairline);
+    }
+
+    .tt-site {
+      font-weight: 700;
+      color: var(--text-primary);
+      text-shadow: var(--text-halo);
+      max-width: 145px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .tt-date {
+      color: var(--text-secondary);
+      text-shadow: var(--text-halo);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .tt-metrics {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .tt-lbl {
+      display: block;
+      font-size: 9.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-secondary);
+      text-shadow: var(--text-halo);
+    }
+
+    .tt-num {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: var(--text-primary);
+      text-shadow: var(--text-halo);
+    }
+
+    .tt-overlap-pill {
+      margin-top: 7px;
+      padding: 3px 8px;
+      border-radius: 8px;
+      background: var(--accent-soft);
+      border: 1px solid var(--accent-border);
+      color: var(--text-primary);
+      text-shadow: var(--text-halo);
+      font-size: 11px;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .drop-glass-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 2000;
+      background: rgba(12, 17, 26, 0.22);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      pointer-events: none;
+    }
+
+    .drop-glass-card {
+      padding: 26px 22px;
+      border-radius: 26px;
+      max-width: 350px;
+      width: 100%;
+      text-align: center;
+    }
+
+    .toast-stack {
+      position: fixed;
+      top: calc(max(12px, env(safe-area-inset-top)) + 112px);
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1500;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      pointer-events: none;
+    }
+
+    .ios-toast {
+      padding: 7px 14px;
+      border-radius: 999px;
+      font-size: 12.5px;
+      font-weight: 600;
+      text-shadow: var(--text-halo);
+      animation: toastPop 0.22s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+
+    @keyframes toastPop {
+      from { opacity: 0; transform: translateY(-6px) scale(0.95); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    /* ==========================================================================
+       9. RESPONSIVE FINE-TUNING FÜR SCHMALE DISPLAYS (AB 360px BREITE)
+       ========================================================================== */
+    @media (max-width: 420px) {
+      .top-glass-bar {
+        gap: 4px;
+        padding: 4px;
+        border-radius: 19px;
+      }
+
+      .lg-btn {
+        height: 32px;
+        padding: 0 8.5px;
+        font-size: 12px;
+        border-radius: 14px;
+        gap: 4px;
+      }
+
+      .ios-segmented {
+        height: 32px;
+        border-radius: 14px;
+      }
+
+      .ios-seg-option {
+        padding: 0 8.5px;
+        font-size: 11.5px;
+      }
+
+      .sub-controls-row {
+        left: 8px;
+        right: 8px;
+        gap: 6px;
+      }
+
+      .map-style-btn {
+        height: 27px;
+        padding: 0 8.5px;
+        font-size: 11px;
+      }
+
+      .timelapse-dock {
+        padding: 10px 12px 11px;
+        border-radius: 20px;
+        gap: 7px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 1. VOLLBILD-KARTE (100vw x 100dvh) -->
+  <div id="map"></div>
+
+  <!-- 2. GLOBALE DRAG & DROP GLAS-ÜBERLAGERUNG -->
+  <div id="dropOverlay" class="drop-glass-overlay hidden">
+    <div class="drop-glass-card liquid-glass liquid-glass-elevated">
+      <div class="empty-icon-badge">
+        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v12m0-12l-4 4m4-4l4 4M4 17v2a1 1 0 001 1h14a1 1 0 001-1v-2" />
+        </svg>
+      </div>
+      <div style="font-size:16px; font-weight:700; text-shadow:var(--text-halo);">IGC-Dateien ablegen</div>
+      <div style="font-size:12.5px; color:var(--text-secondary); margin-top:4px; text-shadow:var(--text-halo);">
+        Loslassen, um die Flüge direkt auf die Karte zu laden.
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST-MELDUNGEN -->
+  <div id="toastStack" class="toast-stack"></div>
+
+  <!-- ========================================================================
+       3. KOMPAKTE 3-ELEMENTE-TOP-BAR (PASSEND AB 360px BREITE)
+       ======================================================================== -->
+  <header class="top-bar-wrapper">
+    <div class="top-glass-bar liquid-glass" role="toolbar" aria-label="Hauptsteuerung">
+      <input type="file" id="igcFileInput" accept=".igc,.IGC" multiple class="hidden" />
+
+      <!-- 1. Links: + IGC Upload -->
+      <button type="button" id="uploadBtn" class="lg-btn lg-btn-primary" title="Mehrere IGC-Dateien hochladen">
+        <span>+ IGC</span>
+      </button>
+
+      <!-- 2. Mitte: Segmented Control Heatmap | Steigrate -->
+      <div id="vizSegmented" class="ios-segmented" data-index="0" role="group" aria-label="Darstellungsmodus">
+        <div class="ios-segmented-thumb"></div>
+        <button type="button" id="modeHeatmapBtn" class="ios-seg-option active">Heatmap</button>
+        <button type="button" id="modeVarioBtn" class="ios-seg-option">Steigrate</button>
+      </div>
+
+      <!-- 3. Rechts: Flüge 10/10 Toggle-Button -->
+      <button
+        type="button"
+        id="flightsPopoverBtn"
+        class="lg-btn lg-btn-glass"
+        aria-expanded="false"
+        aria-controls="flightsPopover"
+        title="Flüge auswählen und verwalten"
+      >
+        <span>Flüge</span>
+        <span id="flightsBadgeCount" class="flights-count-badge tabular">10/10</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ========================================================================
+       4. SUB-BAR DIREKT UNTER DER TOP-BAR:
+          - Links: Kartenauswahl (OSM [Standard mit 3D-Relief] | Topo | Relief)
+          - Rechts: Physischer Tag/Nacht-Glas-Schalter
+       ======================================================================== -->
+  <div class="sub-controls-row">
+    <!-- Links: Kartenauswahl -->
+    <div class="map-style-pill liquid-glass" role="group" aria-label="Kartenstil wählen">
+      <button type="button" class="map-style-btn active" data-map-style="osm">OSM</button>
+      <button type="button" class="map-style-btn" data-map-style="topo">Topo</button>
+      <button type="button" class="map-style-btn" data-map-style="relief">Relief</button>
+    </div>
+
+    <!-- Rechts: Physischer iOS Tag/Nacht-Glas-Schalter (68px x 34px) -->
+    <button
+      type="button"
+      id="themeSwitchBtn"
+      class="theme-glass-switch liquid-glass"
+      role="switch"
+      aria-checked="false"
+      title="Tag-/Nacht-Modus wechseln"
+      aria-label="Tag-/Nacht-Modus wechseln"
+    >
+      <span class="theme-switch-track-icons" aria-hidden="true">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.1" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="4" />
+          <path stroke-linecap="round" d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41" />
+        </svg>
+        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.1" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+        </svg>
+      </span>
+
+      <span class="theme-switch-thumb liquid-glass" aria-hidden="true">
+        <svg id="thumbIconSun" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="4" />
+          <path stroke-linecap="round" d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41" />
+        </svg>
+        <svg id="thumbIconMoon" class="hidden" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+        </svg>
+      </span>
+    </button>
+  </div>
+
+  <!-- Hintergrundfreie Mikro-Legende direkt unter der Sub-Bar -->
+  <aside class="micro-legend-row" aria-label="Farbskala">
+    <div id="legendHeatmapView" style="display:inline-flex; align-items:center; gap:6px;">
+      <span class="micro-legend-lbl">1</span>
+      <div class="micro-legend-bar grad-heatmap"></div>
+      <span id="legendHeatmapMaxLbl" class="micro-legend-lbl">5 Flüge</span>
+    </div>
+
+    <div id="legendVarioView" class="hidden" style="display:inline-flex; align-items:center; gap:6px;">
+      <span class="micro-legend-lbl">-2,5</span>
+      <div class="micro-legend-bar grad-vario"></div>
+      <span class="micro-legend-lbl">+3,5 m/s</span>
+    </div>
+  </aside>
+
+  <!-- ========================================================================
+       5. EIN-/AUSKLAPPBARES "FLÜGE" GLAS-POPOVER (INKL. ZENTRIEREN-SCHALTFLÄCHE)
+       ======================================================================== -->
+  <section
+    id="flightsPopover"
+    class="flights-popover liquid-glass liquid-glass-elevated popover-hidden"
+    role="dialog"
+    aria-label="Flüge verwalten"
+  >
+    <div class="popover-header">
+      <div class="popover-title-wrap">
+        <h2 class="popover-title">Flüge</h2>
+        <span id="popoverCountPill" class="flights-count-badge tabular">10/10</span>
+      </div>
+
+      <div class="popover-header-actions">
+        <button
+          type="button"
+          id="fitBoundsBtn"
+          class="popover-center-btn"
+          title="Alle sichtbaren Flüge auf der Karte zentrieren"
+        >
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.1" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="5.5" />
+            <path stroke-linecap="round" d="M12 2v3m0 14v3M2 12h3m14 0h3" />
+          </svg>
+          <span>Zentrieren</span>
+        </button>
+
+        <button type="button" id="closePopoverBtn" class="ios-close-btn" title="Schließen" aria-label="Schließen">&times;</button>
+      </div>
+    </div>
+
+    <div class="popover-toolbar">
+      <label class="master-check-label">
+        <input type="checkbox" id="masterCheckbox" class="ios-checkbox" checked />
+        <span>Alle</span>
+      </label>
+
+      <div class="popover-actions-right">
+        <span id="popoverTotalDist" class="popover-total-dist tabular">0,0 km</span>
+        <button type="button" id="reloadSamplesBtn" class="btn-pill-mini" title="Alpen-Beispielflüge laden">Beispiele</button>
+        <button type="button" id="clearAllBtn" class="btn-pill-danger" title="Alle Flüge entfernen">Zurücksetzen</button>
+      </div>
+    </div>
+
+    <div class="popover-table-scroll">
+      <table class="ios-flights-table">
+        <thead>
+          <tr>
+            <th class="col-chk"></th>
+            <th class="sortable" data-sort="date">Datum <span id="sortIcon-date">↓</span></th>
+            <th class="sortable" data-sort="site">Startplatz <span id="sortIcon-site">↕</span></th>
+            <th class="sortable col-dist" data-sort="distance">Distanz <span id="sortIcon-distance">↕</span></th>
+            <th class="col-del"></th>
+          </tr>
+        </thead>
+        <tbody id="flightsTableBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ========================================================================
+       6. EMPTY STATE GLASS CARD
+       ======================================================================== -->
+  <section id="emptyWelcomeCard" class="empty-glass-card liquid-glass liquid-glass-elevated hidden" aria-label="Keine Flüge geladen">
+    <div class="empty-icon-badge">
+      <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M3 10c2.5-4.5 15.5-4.5 18 0-3-1.5-6-1.5-9 0-3-1.5-6-1.5-9 0z" />
+        <path stroke-linecap="round" stroke-linejoin="round" d="M4 10l8 9 8-9M12 10v9" />
+      </svg>
+    </div>
+    <h1 style="margin:0; font-size:16.5px; font-weight:700; text-shadow:var(--text-halo);">Keine IGC-Flüge aktiv</h1>
+    <p style="margin:6px 0 15px; font-size:12.5px; line-height:1.45; color:var(--text-secondary); text-shadow:var(--text-halo);">
+      Lade eigene Gleitschirm-IGC-Dateien hoch, ziehe sie auf die Karte oder starte mit den Alpen-Beispielflügen.
+    </p>
+    <div style="display:flex; flex-direction:column; gap:8px;">
+      <button type="button" id="welcomeUploadBtn" class="lg-btn lg-btn-primary" style="width:100%; height:38px;">
+        IGC-Dateien auswählen
+      </button>
+      <button type="button" id="welcomeSampleBtn" class="lg-btn lg-btn-glass" style="width:100%; height:38px;">
+        10 Beispielflüge laden
+      </button>
+    </div>
+  </section>
+
+  <!-- ========================================================================
+       7. SCHWEBENDES ZEITRAFFER-DOCK UNTEN
+       ======================================================================== -->
+  <section id="timelapseDockWrapper" class="timelapse-dock-wrapper" aria-label="Zeitraffer">
+    <div class="timelapse-dock liquid-glass">
+      <div class="dock-top-row">
+        <div class="dock-controls-left">
+          <button type="button" id="playPauseBtn" class="play-circle-btn" title="Play / Pause (Leertaste)">
+            <span id="playPauseIcon">▶</span>
+            <span id="playPauseLabel">Play</span>
+          </button>
+
+          <div id="tlModeSegmented" class="ios-segmented dock-segmented" data-index="0" role="group" aria-label="Zeitraffer-Modus">
+            <div class="ios-segmented-thumb"></div>
+            <button type="button" id="tlModeCumulativeBtn" class="ios-seg-option active">Kumulativ</button>
+            <button type="button" id="tlModeSingleBtn" class="ios-seg-option">Einzeltag</button>
+          </div>
+
+          <button type="button" id="speedCycleBtn" class="speed-pill tabular" title="Abspielgeschwindigkeit ändern">
+            1x
+          </button>
+        </div>
+
+        <div class="dock-status-right">
+          <div class="dock-date-readout">
+            <div id="dockDateText" class="dock-date-main tabular">Alle Tage</div>
+            <div id="dockSubText" class="dock-date-sub tabular">10 Flüge · 5 Tage</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="scrubber-container">
+        <input
+          type="range"
+          id="timelineScrubber"
+          class="ios-scrubber"
+          min="0"
+          max="5000"
+          value="5000"
+          aria-label="Zeitraffer-Fortschritt"
+        />
+      </div>
+
+      <div id="dayChipsRow" class="day-chips-row" role="list" aria-label="Flugtage"></div>
+    </div>
+  </section>
+
+  <!-- ========================================================================
+       8. SCHWEBENDER GLAS-INFO-TOOLTIP BEI TRACK-HOVER / TAP
+       ======================================================================== -->
+  <div id="trackTooltip" class="ios-track-tooltip liquid-glass liquid-glass-elevated hidden">
+    <div class="tt-top">
+      <span id="ttSite" class="tt-site">Startplatz</span>
+      <span id="ttDate" class="tt-date tabular">14.11.2026</span>
+    </div>
+    <div class="tt-metrics">
+      <div>
+        <span class="tt-lbl">Höhe</span>
+        <span id="ttAlt" class="tt-num tabular">1.650 m</span>
+      </div>
+      <div>
+        <span class="tt-lbl">Steigrate</span>
+        <span id="ttVario" class="tt-num tabular">+1,8 m/s</span>
+      </div>
+    </div>
+    <div id="ttOverlap" class="tt-overlap-pill hidden"></div>
+  </div>
+
+  <script>
+    /**
+     * ==========================================================================
+     * IGC FLUG-HEATMAP & ZEITRAFFER-VIEWER
+     * - Silky-Smooth C1-stetige Catmull-Rom-zu-Kubisch-Bézier-Splines + Soft Edge Feathering
+     * - Exakte Integer-Pixel-Deduplizierung (Uint16Array totalCounts) mit voller Farbdynamik
+     * - Kontraststarke 7-Stufen-Steigratenskala (-2.5 bis +3.5 m/s) mit S-Kurven-Spreizung
+     * - Einzelner weicher Zeitraffer-Lichtpunkt (nur während aktivem Play)
+     * - Standardkarte "OSM" mit 3D-Relief-Schummerung, Topo & Relief inkl. Dark Mode
+     * ==========================================================================
+     */
+
+    const SPEED_STEPS = [0.5, 1, 2, 4];
+
+    // Bekannte Alpen-Startplätze zur automatischen Erkennung bei fehlendem HFSIT-Header
+    const ALPINE_LAUNCH_SITES = [
+      { name: 'Brauneck Garland', lat: 47.6632, lon: 11.5255 },
+      { name: 'Brauneck Gipfel', lat: 47.6645, lon: 11.5220 },
+      { name: 'Benediktenwand', lat: 47.6532, lon: 11.4660 },
+      { name: 'Herzogstand', lat: 47.6115, lon: 11.3075 },
+      { name: 'Wallberg', lat: 47.6655, lon: 11.7955 },
+      { name: 'Jochberg', lat: 47.6345, lon: 11.3850 },
+      { name: 'Blomberg', lat: 47.7345, lon: 11.5080 },
+      { name: 'Tegelberg', lat: 47.5595, lon: 10.7790 },
+      { name: 'Laber Oberammergau', lat: 47.5860, lon: 11.1025 },
+      { name: 'Kampenwand', lat: 47.7565, lon: 12.3680 },
+      { name: 'Kössen Unterberghorn', lat: 47.6380, lon: 12.4260 },
+      { name: 'Nebelhorn', lat: 47.4215, lon: 10.3425 },
+    ];
+
+    const state = {
+      theme: 'light',          // 'light' | 'dark'
+      mapStyle: 'osm',         // 'osm' (Standard mit 3D-Relief) | 'topo' | 'relief'
+      vizMode: 'heatmap',      // 'heatmap' | 'vario'
+      flights: [],
+      nextFlightId: 1,
+      sortBy: 'date',          // 'date' | 'site' | 'distance'
+      sortDir: 'desc',         // 'asc' | 'desc'
+      flightsPopoverOpen: false,
+
+      timelapse: {
+        days: [],
+        showAllDays: true,
+        currentDayIndex: 0,
+        dayProgress: 1.0,
+        isPlaying: false,
+        mode: 'cumulative',    // 'cumulative' | 'single'
+        speedIdx: 1,           // 1 => 1x
+        rafId: null,
+        lastFrameTime: null,
+        lastDrawTime: 0,
+      },
+    };
+
+    // --------------------------------------------------------------------------
+    // 1. HOCHGESÄTTIGTE FARBSKALEN (7-STUFEN HEATMAP & S-KURVEN STEIGRATE)
+    // --------------------------------------------------------------------------
+    function interpolateStops(stops, t) {
+      const clamped = Math.max(0, Math.min(1, t));
+      for (let i = 0; i < stops.length - 1; i++) {
+        const s0 = stops[i];
+        const s1 = stops[i + 1];
+        if (clamped >= s0.t && clamped <= s1.t) {
+          const f = (clamped - s0.t) / Math.max(1e-6, s1.t - s0.t);
+          return [
+            Math.round(s0.c[0] + (s1.c[0] - s0.c[0]) * f),
+            Math.round(s0.c[1] + (s1.c[1] - s0.c[1]) * f),
+            Math.round(s0.c[2] + (s1.c[2] - s0.c[2]) * f),
+          ];
+        }
+      }
+      return stops[stops.length - 1].c;
+    }
+
+    // 7-Stufen Heatmap-Farbskala (t = 0.00 Elektroblau -> t = 1.00 Magenta-Weiß-Kern)
+    const HEATMAP_STOPS = [
+      { t: 0.00, c: [0, 102, 255] },    // 1. Elektroblau (1 Flug)
+      { t: 0.18, c: [0, 225, 255] },    // 2. Leuchtendes Cyan
+      { t: 0.36, c: [0, 235, 95] },     // 3. Smaragd-/Neongrün
+      { t: 0.55, c: [255, 230, 0] },    // 4. Reines Sonnengelb
+      { t: 0.74, c: [255, 115, 0] },    // 5. Feuer-Orange
+      { t: 0.90, c: [245, 15, 45] },    // 6. Signalrot
+      { t: 0.96, c: [255, 70, 200] },   // 7a. Leuchtendes Magenta
+      { t: 1.00, c: [255, 215, 248] },  // 7b. Magenta-Weiß-Kern (absolutes Maximum)
+    ];
+
+    function getHeatmapColorPacked(count, maxOverlap, coverageAlpha) {
+      let t = 0.0;
+      if (maxOverlap >= 2 && count > 1) {
+        const rawT = Math.max(0, Math.min(1, (count - 1) / (maxOverlap - 1)));
+        t = Math.pow(rawT, 0.78);
+      }
+      const [r, g, b] = interpolateStops(HEATMAP_STOPS, t);
+
+      // Sanftes Alpha aus der anti-aliased Strichabdeckung (alpha > 36 -> 45..255)
+      const covNorm = Math.max(0, Math.min(1, (coverageAlpha - 36) / 219));
+      const a = Math.round(45 + covNorm * 210);
+
+      // Little-Endian ABGR Packing für Uint32Array
+      return (a << 24) | (b << 16) | (g << 8) | r;
+    }
+
+    // Kontraststarke 7-Stufen Steigraten-Skala (-2.5 m/s bis +3.5 m/s) mit S-Kurven-Spreizung um 0.0 m/s
+    const VARIO_MIN = -2.5;
+    const VARIO_MAX = 3.5;
+    const VARIO_STOPS = [
+      { t: 0.00, c: [91, 0, 255] },    // <= -2.5 m/s: Tiefes Elektro-Violett (#5b00ff)
+      { t: 0.20, c: [0, 102, 255] },   //    -1.3 m/s: Kräftiges Kobaltblau (#0066ff)
+      { t: 0.35, c: [0, 216, 255] },   //    -0.4 m/s: Helles Cyan (#00d8ff)
+      { t: 0.42, c: [0, 230, 100] },   //     0.0 m/s: Sattes Smaragdgrün (#00e664)
+      { t: 0.58, c: [212, 255, 0] },   //    +1.0 m/s: Leuchtendes Limetten-Gelb (#d4ff00)
+      { t: 0.75, c: [255, 123, 0] },   //    +2.0 m/s: Intensives Orange (#ff7b00)
+      { t: 1.00, c: [255, 0, 85] },    // >= +3.5 m/s: Hyper-gesättigtes Signalrot / Neon-Magenta (#ff0055)
+    ];
+
+    function normalizeVarioSCurve(vario) {
+      const clamped = Math.max(VARIO_MIN, Math.min(VARIO_MAX, vario));
+      if (clamped < 0) {
+        // Negative Seite: [-2.5, 0.0] -> [0.00, 0.42], mit Spreizung weg von 0.0 m/s
+        const u = Math.abs(clamped) / Math.abs(VARIO_MIN); // 0 bei 0.0, 1 bei -2.5
+        const spread = Math.pow(u, 0.74);
+        return 0.42 * (1 - spread);
+      } else {
+        // Positive Seite: [0.0, +3.5] -> [0.42, 1.00], mit Spreizung weg von 0.0 m/s
+        const u = clamped / VARIO_MAX; // 0 bei 0.0, 1 bei +3.5
+        const spread = Math.pow(u, 0.74);
+        return 0.42 + 0.58 * spread;
+      }
+    }
+
+    function getVarioRGB(vario) {
+      const t = normalizeVarioSCurve(vario);
+      return interpolateStops(VARIO_STOPS, t);
+    }
+
+    function getVarioColor(vario) {
+      const [r, g, b] = getVarioRGB(vario);
+      return `rgb(${r},${g},${b})`;
+    }
+
+    // --------------------------------------------------------------------------
+    // 2. GEO- & IGC-PARSER (FAI STANDARD + GEGLÄTTETE VARIO-BERECHNUNG)
+    // --------------------------------------------------------------------------
+    function haversineKm(lat1, lon1, lat2, lon2) {
+      const toRad = Math.PI / 180;
+      const dLat = (lat2 - lat1) * toRad;
+      const dLon = (lon2 - lon1) * toRad;
+      const a =
+        Math.sin(dLat * 0.5) * Math.sin(dLat * 0.5) +
+        Math.cos(lat1 * toRad) * Math.cos(lat2 * toRad) * Math.sin(dLon * 0.5) * Math.sin(dLon * 0.5);
+      return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    function detectLaunchSite(lat, lon) {
+      let bestSite = null;
+      let bestDist = 6.0;
+      for (let i = 0; i < ALPINE_LAUNCH_SITES.length; i++) {
+        const s = ALPINE_LAUNCH_SITES[i];
+        const d = haversineKm(lat, lon, s.lat, s.lon);
+        if (d < bestDist) {
+          bestDist = d;
+          bestSite = s.name;
+        }
+      }
+      if (bestSite) return bestSite;
+      return `${lat.toFixed(3)}°N, ${lon.toFixed(3)}°E`;
+    }
+
+    function parseIGCCoord(latStr, latHemi, lonStr, lonHemi) {
+      const latDeg = parseInt(latStr.slice(0, 2), 10);
+      const latMin = parseInt(latStr.slice(2, 4), 10);
+      const latThou = parseInt(latStr.slice(4, 7), 10);
+      let lat = latDeg + (latMin + latThou / 1000) / 60;
+      if (latHemi === 'S') lat = -lat;
+
+      const lonDeg = parseInt(lonStr.slice(0, 3), 10);
+      const lonMin = parseInt(lonStr.slice(3, 5), 10);
+      const lonThou = parseInt(lonStr.slice(5, 8), 10);
+      let lon = lonDeg + (lonMin + lonThou / 1000) / 60;
+      if (lonHemi === 'W') lon = -lon;
+
+      return [lat, lon];
+    }
+
+    function formatDuration(totalSec) {
+      if (!totalSec || totalSec <= 0) return '';
+      const h = Math.floor(totalSec / 3600);
+      const m = Math.floor((totalSec % 3600) / 60);
+      return h > 0 ? `${h}h ${String(m).padStart(2, '0')}m` : `${m}m`;
+    }
+
+    function parseIGCFile(filename, rawText) {
+      const lines = rawText.split(/\r?\n/);
+      let dateKey = '1970-01-01';
+      let dateDisplay = 'Unbekannt';
+      let shortLabel = '??.??.';
+      let dateTimestamp = 0;
+      let pilot = '';
+      let site = '';
+
+      const rawPoints = [];
+      let dayOffsetSec = 0;
+      let prevSecOfDay = null;
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+
+        if (line.startsWith('HFDTE')) {
+          const m = line.match(/HFDTE(?:DATE:)?(\d{2})(\d{2})(\d{2})/);
+          if (m) {
+            const dd = parseInt(m[1], 10);
+            const mm = parseInt(m[2], 10);
+            const yy = parseInt(m[3], 10);
+            const yyyy = yy >= 70 ? 1900 + yy : 2000 + yy;
+            const dStr = String(dd).padStart(2, '0');
+            const mStr = String(mm).padStart(2, '0');
+            dateKey = `${yyyy}-${mStr}-${dStr}`;
+            dateDisplay = `${dStr}.${mStr}.${yyyy}`;
+            shortLabel = `${dStr}.${mStr}.`;
+            dateTimestamp = Date.UTC(yyyy, mm - 1, dd);
+          }
+        } else if (line.startsWith('HFPLT')) {
+          const idx = line.indexOf(':');
+          if (idx !== -1) pilot = line.slice(idx + 1).trim();
+        } else if (line.startsWith('HFSIT') || line.startsWith('HFCCL') || line.startsWith('HFCID')) {
+          if (!site) {
+            const idx = line.indexOf(':');
+            if (idx !== -1) {
+              const candidate = line.slice(idx + 1).trim();
+              if (candidate && candidate.toLowerCase() !== 'unknown') site = candidate;
+            }
+          }
+        } else if (line.charCodeAt(0) === 66 && line.length >= 35) {
+          const hh = parseInt(line.slice(1, 3), 10);
+          const mm = parseInt(line.slice(3, 5), 10);
+          const ss = parseInt(line.slice(5, 7), 10);
+          if (Number.isNaN(hh) || Number.isNaN(mm) || Number.isNaN(ss)) continue;
+
+          const latStr = line.slice(7, 14);
+          const latH = line[14];
+          const lonStr = line.slice(15, 23);
+          const lonH = line[23];
+          if ((latH !== 'N' && latH !== 'S') || (lonH !== 'E' && lonH !== 'W')) continue;
+
+          const [lat, lon] = parseIGCCoord(latStr, latH, lonStr, lonH);
+          if (Math.abs(lat) < 0.001 && Math.abs(lon) < 0.001) continue;
+
+          const pressAlt = parseInt(line.slice(25, 30), 10);
+          const gnssAlt = parseInt(line.slice(30, 35), 10);
+          const alt = !Number.isNaN(gnssAlt) && gnssAlt > 0 ? gnssAlt : !Number.isNaN(pressAlt) ? pressAlt : 0;
+
+          const secOfDay = hh * 3600 + mm * 60 + ss;
+          if (prevSecOfDay !== null && secOfDay + 43200 < prevSecOfDay) {
+            dayOffsetSec += 86400;
+          }
+          prevSecOfDay = secOfDay;
+          const timeSec = secOfDay + dayOffsetSec;
+
+          if (rawPoints.length > 0) {
+            const last = rawPoints[rawPoints.length - 1];
+            const dt = Math.max(1, timeSec - last.timeSec);
+            const distKm = haversineKm(last.lat, last.lon, lat, lon);
+            if ((distKm / dt) * 3600 > 180) continue;
+          }
+
+          rawPoints.push({ lat, lon, alt, timeSec, vario: 0 });
+        }
+      }
+
+      if (rawPoints.length < 2) {
+        throw new Error(`Zu wenige gültige GPS-Punkte in ${filename}`);
+      }
+
+      let totalDistKm = 0;
+      let maxAlt = -Infinity;
+      let minLat = Infinity, maxLat = -Infinity, minLon = Infinity, maxLon = -Infinity;
+
+      for (let i = 0; i < rawPoints.length; i++) {
+        const p = rawPoints[i];
+        if (p.alt > maxAlt) maxAlt = p.alt;
+        if (p.lat < minLat) minLat = p.lat;
+        if (p.lat > maxLat) maxLat = p.lat;
+        if (p.lon < minLon) minLon = p.lon;
+        if (p.lon > maxLon) maxLon = p.lon;
+
+        if (i > 0) {
+          const prev = rawPoints[i - 1];
+          totalDistKm += haversineKm(prev.lat, prev.lon, p.lat, p.lon);
+        }
+
+        // Zentriertes Gleitfenster (±2 Punkte UND mindestens 4 Sekunden Zeitdifferenz) gegen 1-m-Stufenrauschen
+        let w0 = Math.max(0, i - 2);
+        let w1 = Math.min(rawPoints.length - 1, i + 2);
+        while (
+          rawPoints[w1].timeSec - rawPoints[w0].timeSec < 4 &&
+          (w0 > 0 || w1 < rawPoints.length - 1)
+        ) {
+          if (w0 > 0) w0--;
+          if (rawPoints[w1].timeSec - rawPoints[w0].timeSec < 4 && w1 < rawPoints.length - 1) {
+            w1++;
+          }
+        }
+        const dt = Math.max(1, rawPoints[w1].timeSec - rawPoints[w0].timeSec);
+        p.vario = (rawPoints[w1].alt - rawPoints[w0].alt) / dt;
+      }
+
+      if (!site) {
+        site = detectLaunchSite(rawPoints[0].lat, rawPoints[0].lon);
+      }
+
+      const durationSec = rawPoints[rawPoints.length - 1].timeSec - rawPoints[0].timeSec;
+
+      return {
+        id: state.nextFlightId++,
+        filename,
+        site,
+        pilot,
+        dateKey,
+        dateDisplay,
+        shortLabel,
+        dateTimestamp,
+        distanceKm: totalDistKm,
+        maxAlt: Number.isFinite(maxAlt) ? maxAlt : 0,
+        durationText: formatDuration(durationSec),
+        visible: true,
+        points: rawPoints,
+        bounds: L.latLngBounds([minLat, minLon], [maxLat, maxLon]),
+      };
+    }
+
+    // --------------------------------------------------------------------------
+    // 3. ZEITRAFFER-DATENSTRUKTUR & RENDER-AUSWAHL
+    // --------------------------------------------------------------------------
+    function rebuildTimelapseDays(preserveDateKey = null) {
+      const tl = state.timelapse;
+      const visibleFlights = state.flights.filter((f) => f.visible);
+      const dayMap = new Map();
+
+      for (let i = 0; i < visibleFlights.length; i++) {
+        const f = visibleFlights[i];
+        if (!dayMap.has(f.dateKey)) {
+          dayMap.set(f.dateKey, {
+            dateKey: f.dateKey,
+            dateDisplay: f.dateDisplay,
+            shortLabel: f.shortLabel,
+            dateTimestamp: f.dateTimestamp,
+            flights: [],
+          });
+        }
+        dayMap.get(f.dateKey).flights.push(f);
+      }
+
+      const sortedDays = Array.from(dayMap.values()).sort((a, b) => a.dateTimestamp - b.dateTimestamp);
+      tl.days = sortedDays;
+
+      if (sortedDays.length === 0) {
+        tl.showAllDays = true;
+        tl.currentDayIndex = 0;
+        tl.dayProgress = 1.0;
+        return;
+      }
+
+      if (preserveDateKey) {
+        const foundIdx = sortedDays.findIndex((d) => d.dateKey === preserveDateKey);
+        if (foundIdx !== -1) {
+          tl.currentDayIndex = foundIdx;
+          return;
+        }
+      }
+
+      if (tl.currentDayIndex >= sortedDays.length) {
+        tl.currentDayIndex = sortedDays.length - 1;
+      }
+    }
+
+    function getActiveRenderEntries() {
+      const tl = state.timelapse;
+      const visibleFlights = state.flights.filter((f) => f.visible);
+      if (visibleFlights.length === 0) return [];
+
+      if (tl.showAllDays || tl.days.length === 0) {
+        return visibleFlights.map((flight) => ({
+          flight,
+          progress: 1.0,
+          isCurrentDay: true,
+        }));
+      }
+
+      const activeDay = tl.days[tl.currentDayIndex];
+      if (!activeDay) return [];
+
+      const entries = [];
+      const clampedProgress = Math.max(0, Math.min(1, tl.dayProgress));
+
+      if (tl.mode === 'cumulative') {
+        for (let d = 0; d <= tl.currentDayIndex; d++) {
+          const dayObj = tl.days[d];
+          const isCurr = d === tl.currentDayIndex;
+          const prog = isCurr ? clampedProgress : 1.0;
+          for (let i = 0; i < dayObj.flights.length; i++) {
+            entries.push({
+              flight: dayObj.flights[i],
+              progress: prog,
+              isCurrentDay: isCurr,
+            });
+          }
+        }
+      } else {
+        for (let i = 0; i < activeDay.flights.length; i++) {
+          entries.push({
+            flight: activeDay.flights[i],
+            progress: clampedProgress,
+            isCurrentDay: true,
+          });
+        }
+      }
+
+      return entries;
+    }
+
+    function getPointLimit(totalPoints, progress) {
+      if (progress >= 0.999) return totalPoints;
+      if (progress <= 0) return 0;
+      return Math.max(2, Math.min(totalPoints, Math.ceil(totalPoints * progress)));
+    }
+
+    // --------------------------------------------------------------------------
+    // 4. SILKY-SMOOTH HIDPI LEAFLET CANVAS LAYER
+    //    - C1-stetige Catmull-Rom-zu-Kubisch-Bézier-Splines + Soft Edge Feathering
+    //    - Exakte Integer-Deduplizierung (Uint16Array totalCounts + Uint8Array maxCoverage)
+    //    - Einziger weicher radialer Lichtpunkt nur während aktivem Zeitraffer-Play
+    // --------------------------------------------------------------------------
+    function buildSmoothScreenPoints(map, points, limit, dpr) {
+      const result = [];
+      const minStepSq = 0.55 * dpr * (0.55 * dpr);
+      let lastX = NaN;
+      let lastY = NaN;
+
+      for (let i = 0; i < limit; i++) {
+        const p = points[i];
+        const sp = map.latLngToContainerPoint([p.lat, p.lon]);
+        const x = sp.x * dpr;
+        const y = sp.y * dpr;
+
+        if (i === 0 || i === limit - 1) {
+          result.push({ x, y, vario: p.vario });
+          lastX = x;
+          lastY = y;
+        } else {
+          const dx = x - lastX;
+          const dy = y - lastY;
+          if (dx * dx + dy * dy >= minStepSq) {
+            result.push({ x, y, vario: p.vario });
+            lastX = x;
+            lastY = y;
+          }
+        }
+      }
+      return result;
+    }
+
+    function computeCatmullRomControlPoints(pPrev, p0, p1, pNext) {
+      let t1x = (p1.x - pPrev.x) / 6;
+      let t1y = (p1.y - pPrev.y) / 6;
+      let t2x = (pNext.x - p0.x) / 6;
+      let t2y = (pNext.y - p0.y) / 6;
+
+      const segLen = Math.hypot(p1.x - p0.x, p1.y - p0.y);
+      const maxHandle = segLen * 0.45;
+
+      const len1 = Math.hypot(t1x, t1y);
+      if (len1 > maxHandle && len1 > 1e-4) {
+        const s = maxHandle / len1;
+        t1x *= s;
+        t1y *= s;
+      }
+
+      const len2 = Math.hypot(t2x, t2y);
+      if (len2 > maxHandle && len2 > 1e-4) {
+        const s = maxHandle / len2;
+        t2x *= s;
+        t2y *= s;
+      }
+
+      return {
+        c1x: p0.x + t1x,
+        c1y: p0.y + t1y,
+        c2x: p1.x - t2x,
+        c2y: p1.y - t2y,
+      };
+    }
+
+    function traceCatmullRomBezier(ctx, pts) {
+      const n = pts.length;
+      if (n === 0) return;
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      if (n === 1) return;
+      if (n === 2) {
+        ctx.lineTo(pts[1].x, pts[1].y);
+        return;
+      }
+
+      for (let i = 0; i < n - 1; i++) {
+        const pPrev = i > 0 ? pts[i - 1] : pts[i];
+        const p0 = pts[i];
+        const p1 = pts[i + 1];
+        const pNext = i + 2 < n ? pts[i + 2] : pts[i + 1];
+
+        const { c1x, c1y, c2x, c2y } = computeCatmullRomControlPoints(pPrev, p0, p1, pNext);
+        ctx.bezierCurveTo(c1x, c1y, c2x, c2y, p1.x, p1.y);
+      }
+    }
+
+    const FlightCanvasLayer = L.Layer.extend({
+      initialize: function () {
+        this._canvas = null;
+        this._ctx = null;
+
+        // Wiederverwendetes Offscreen-Canvas pro Einzel-Flug zur exakten Pixel-Deduplizierung
+        this._flightCanvas = document.createElement('canvas');
+        this._flightCtx = this._flightCanvas.getContext('2d', { willReadFrequently: true });
+
+        // Output-Canvas für LUT-ImageData vor dem zweischichtigen Soft-Edge-Rendering
+        this._outCanvas = document.createElement('canvas');
+        this._outCtx = this._outCanvas.getContext('2d');
+        this._outImg = null;
+        this._out32 = null;
+
+        // Wiederverwendete TypedArrays für Integer-Flugzählung & Anti-Aliasing-Abdeckung
+        this._totalCounts = null;
+        this._maxCoverage = null;
+        this._bufW = 0;
+        this._bufH = 0;
+
+        this._rafId = null;
+      },
+
+      onAdd: function (map) {
+        this._map = map;
+        this._canvas = L.DomUtil.create('canvas', 'leaflet-layer leaflet-zoom-animated');
+        this._canvas.style.pointerEvents = 'none';
+        this._canvas.style.position = 'absolute';
+        this._canvas.style.top = '0';
+        this._canvas.style.left = '0';
+        this._ctx = this._canvas.getContext('2d');
+
+        map.getPanes().overlayPane.appendChild(this._canvas);
+        map.on('moveend zoomend viewreset resize', this._scheduleRedraw, this);
+        if (map.options.zoomAnimation) {
+          map.on('zoomanim', this._animateZoom, this);
+        }
+        this.redraw();
+      },
+
+      onRemove: function (map) {
+        if (this._rafId) cancelAnimationFrame(this._rafId);
+        map.off('moveend zoomend viewreset resize', this._scheduleRedraw, this);
+        if (map.options.zoomAnimation) {
+          map.off('zoomanim', this._animateZoom, this);
+        }
+        if (this._canvas && this._canvas.parentNode) {
+          this._canvas.parentNode.removeChild(this._canvas);
+        }
+      },
+
+      _animateZoom: function (e) {
+        const scale = this._map.getZoomScale(e.zoom);
+        const offset = this._map._latLngBoundsToNewLayerBounds(
+          this._map.getBounds(),
+          e.zoom,
+          e.center
+        ).min;
+        L.DomUtil.setTransform(this._canvas, offset, scale);
+      },
+
+      _scheduleRedraw: function () {
+        if (this._rafId) cancelAnimationFrame(this._rafId);
+        this._rafId = requestAnimationFrame(() => {
+          this._rafId = null;
+          this.redraw();
+        });
+      },
+
+      redraw: function () {
+        if (!this._map || !this._canvas) return;
+
+        const size = this._map.getSize();
+        const cssWidth = Math.max(1, size.x);
+        const cssHeight = Math.max(1, size.y);
+
+        // Volle HiDPI-Auflösung (gedeckelt bei 2x für flüssige 60fps)
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const width = Math.max(1, Math.round(cssWidth * dpr));
+        const height = Math.max(1, Math.round(cssHeight * dpr));
+
+        const topLeft = this._map.containerPointToLayerPoint([0, 0]);
+        L.DomUtil.setTransform(this._canvas, topLeft, 1);
+
+        if (this._canvas.width !== width || this._canvas.height !== height) {
+          this._canvas.width = width;
+          this._canvas.height = height;
+          this._canvas.style.width = `${cssWidth}px`;
+          this._canvas.style.height = `${cssHeight}px`;
+
+          this._flightCanvas.width = width;
+          this._flightCanvas.height = height;
+          this._outCanvas.width = width;
+          this._outCanvas.height = height;
+        }
+
+        if (this._bufW !== width || this._bufH !== height || !this._totalCounts) {
+          this._totalCounts = new Uint16Array(width * height);
+          this._maxCoverage = new Uint8Array(width * height);
+          this._outImg = this._outCtx.createImageData(width, height);
+          this._out32 = new Uint32Array(this._outImg.data.buffer);
+          this._bufW = width;
+          this._bufH = height;
+        }
+
+        const ctx = this._ctx;
+        ctx.save();
+        ctx.filter = 'none';
+        ctx.globalAlpha = 1.0;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.clearRect(0, 0, width, height);
+        ctx.restore();
+
+        const entries = getActiveRenderEntries();
+        if (entries.length === 0) {
+          updateLegendMaxLabel(1);
+          return;
+        }
+
+        const mapBounds = this._map.getBounds();
+
+        if (state.vizMode === 'heatmap') {
+          this._drawHeatmapDeduplicated(ctx, entries, mapBounds, width, height, dpr);
+        } else {
+          this._drawVarioFeathered(ctx, entries, mapBounds, dpr);
+        }
+
+        // Einziger weicher radialer Lichtpunkt ausschließlich während aktivem Zeitraffer-Play
+        this._drawSingleTimelapseGlow(ctx, entries, mapBounds, dpr);
+      },
+
+      _drawHeatmapDeduplicated: function (ctx, entries, mapBounds, width, height, dpr) {
+        const totalCounts = this._totalCounts;
+        const maxCoverage = this._maxCoverage;
+        totalCounts.fill(0);
+        maxCoverage.fill(0);
+
+        const fCtx = this._flightCtx;
+        fCtx.lineCap = 'round';
+        fCtx.lineJoin = 'round';
+        fCtx.strokeStyle = '#ffffff';
+        const lineWidth = 3.2 * dpr;
+        fCtx.lineWidth = lineWidth;
+
+        const pad = Math.ceil(lineWidth) + 4;
+        let unionMinX = width;
+        let unionMinY = height;
+        let unionMaxX = 0;
+        let unionMaxY = 0;
+        let drawnFlights = 0;
+
+        // 1. Jeden sichtbaren Flug einzeln in reinem Weiß auf flightCanvas zeichnen
+        //    und totalCounts[p] += 1 für jedes Pixel mit alpha > 36 hochzählen
+        for (let idx = 0; idx < entries.length; idx++) {
+          const { flight, progress } = entries[idx];
+          if (progress <= 0 || !mapBounds.intersects(flight.bounds)) continue;
+
+          const limit = getPointLimit(flight.points.length, progress);
+          if (limit < 2) continue;
+
+          const smoothPts = buildSmoothScreenPoints(this._map, flight.points, limit, dpr);
+          if (smoothPts.length < 2) continue;
+
+          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+          for (let i = 0; i < smoothPts.length; i++) {
+            const pt = smoothPts[i];
+            if (pt.x < minX) minX = pt.x;
+            if (pt.x > maxX) maxX = pt.x;
+            if (pt.y < minY) minY = pt.y;
+            if (pt.y > maxY) maxY = pt.y;
+          }
+
+          const x0 = Math.max(0, Math.floor(minX) - pad);
+          const y0 = Math.max(0, Math.floor(minY) - pad);
+          const x1 = Math.min(width - 1, Math.ceil(maxX) + pad);
+          const y1 = Math.min(height - 1, Math.ceil(maxY) + pad);
+          if (x1 < x0 || y1 < y0) continue;
+
+          const boxW = x1 - x0 + 1;
+          const boxH = y1 - y0 + 1;
+
+          fCtx.clearRect(x0, y0, boxW, boxH);
+          traceCatmullRomBezier(fCtx, smoothPts);
+          fCtx.stroke();
+
+          const imgData = fCtx.getImageData(x0, y0, boxW, boxH).data;
+          let alphaPtr = 3; // Alpha-Kanal des ersten Pixels
+
+          for (let y = y0; y <= y1; y++) {
+            let p = y * width + x0;
+            for (let x = x0; x <= x1; x++, p++, alphaPtr += 4) {
+              const alpha = imgData[alphaPtr];
+              if (alpha > 36) {
+                totalCounts[p] += 1;
+                if (alpha > maxCoverage[p]) {
+                  maxCoverage[p] = alpha;
+                }
+              }
+            }
+          }
+
+          if (x0 < unionMinX) unionMinX = x0;
+          if (y0 < unionMinY) unionMinY = y0;
+          if (x1 > unionMaxX) unionMaxX = x1;
+          if (y1 > unionMaxY) unionMaxY = y1;
+          drawnFlights++;
+        }
+
+        if (drawnFlights === 0 || unionMaxX < unionMinX || unionMaxY < unionMinY) {
+          updateLegendMaxLabel(1);
+          return;
+        }
+
+        // 2. Dynamisches maxOverlap über alle Pixel im aktuellen Bildausschnitt bestimmen
+        let maxOverlap = 1;
+        for (let y = unionMinY; y <= unionMaxY; y++) {
+          let p = y * width + unionMinX;
+          for (let x = unionMinX; x <= unionMaxX; x++, p++) {
+            const c = totalCounts[p];
+            if (c > maxOverlap) maxOverlap = c;
+          }
+        }
+
+        updateLegendMaxLabel(maxOverlap);
+
+        // 3. Pixel in das Output-ImageData einfärben (Elektroblau bei count === 1)
+        const out32 = this._out32;
+        out32.fill(0);
+
+        for (let y = unionMinY; y <= unionMaxY; y++) {
+          let p = y * width + unionMinX;
+          for (let x = unionMinX; x <= unionMaxX; x++, p++) {
+            const c = totalCounts[p];
+            if (c > 0) {
+              out32[p] = getHeatmapColorPacked(c, maxOverlap, maxCoverage[p]);
+            }
+          }
+        }
+
+        this._outCtx.putImageData(this._outImg, 0, 0);
+
+        // 4. Zweischichtiges Soft-Edge-Feathering auf das Display-Canvas zeichnen
+        ctx.save();
+        // Schicht 1: Weichgezeichnete Außen-Kontur ("leichte Unschärfe am Rand")
+        ctx.filter = 'blur(2.4px)';
+        ctx.globalAlpha = 0.52;
+        ctx.drawImage(this._outCanvas, 0, 0);
+
+        // Schicht 2: Weich geglätteter Kern
+        ctx.filter = 'blur(0.55px)';
+        ctx.globalAlpha = 0.96;
+        ctx.drawImage(this._outCanvas, 0, 0);
+
+        ctx.filter = 'none';
+        ctx.globalAlpha = 1.0;
+        ctx.restore();
+      },
+
+      _drawVarioFeathered: function (ctx, entries, mapBounds, dpr) {
+        const haloWidth = 5.5 * dpr;
+        const coreWidth = 2.6 * dpr;
+
+        for (let idx = 0; idx < entries.length; idx++) {
+          const { flight, progress, isCurrentDay } = entries[idx];
+          if (progress <= 0 || !mapBounds.intersects(flight.bounds)) continue;
+
+          const limit = getPointLimit(flight.points.length, progress);
+          if (limit < 2) continue;
+
+          const smoothPts = buildSmoothScreenPoints(this._map, flight.points, limit, dpr);
+          const n = smoothPts.length;
+          if (n < 2) continue;
+
+          const dimmed =
+            !state.timelapse.showAllDays &&
+            state.timelapse.mode === 'cumulative' &&
+            !isCurrentDay;
+          const dimFactor = dimmed ? 0.45 : 1.0;
+
+          // Durchgang 1: Performanter, weicher Lichtsaum (ohne teure GPU-Canvas-Filter)
+          ctx.save();
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.lineWidth = haloWidth;
+          ctx.globalAlpha = 0.28 * dimFactor;
+          this._strokeVarioSegments(ctx, smoothPts, dpr);
+          ctx.restore();
+
+          // Durchgang 2: Gestochen scharfer Kern
+          ctx.save();
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.lineWidth = coreWidth;
+          ctx.globalAlpha = 0.98 * dimFactor;
+          this._strokeVarioSegments(ctx, smoothPts, dpr);
+          ctx.restore();
+        }
+      },
+
+      _strokeVarioSegments: function (ctx, smoothPts, dpr) {
+        const n = smoothPts.length;
+        for (let i = 0; i < n - 1; i++) {
+          const pPrev = i > 0 ? smoothPts[i - 1] : smoothPts[i];
+          const p0 = smoothPts[i];
+          const p1 = smoothPts[i + 1];
+          const pNext = i + 2 < n ? smoothPts[i + 2] : smoothPts[i + 1];
+
+          const { c1x, c1y, c2x, c2y } = computeCatmullRomControlPoints(pPrev, p0, p1, pNext);
+
+          const c0 = getVarioColor(p0.vario);
+          const c1 = getVarioColor(p1.vario);
+
+          if (c0 === c1 || Math.hypot(p1.x - p0.x, p1.y - p0.y) < 3 * dpr) {
+            ctx.strokeStyle = c1;
+          } else {
+            const grad = ctx.createLinearGradient(p0.x, p0.y, p1.x, p1.y);
+            grad.addColorStop(0, c0);
+            grad.addColorStop(1, c1);
+            ctx.strokeStyle = grad;
+          }
+
+          ctx.beginPath();
+          ctx.moveTo(p0.x, p0.y);
+          ctx.bezierCurveTo(c1x, c1y, c2x, c2y, p1.x, p1.y);
+          ctx.stroke();
+        }
+      },
+
+      _drawSingleTimelapseGlow: function (ctx, entries, mapBounds, dpr) {
+        // Ausschließlich zeichnen, wenn der Zeitraffer aktiv läuft (isPlaying === true)
+        if (!state.timelapse.isPlaying || state.timelapse.showAllDays) return;
+
+        // Maximal EINEN einzigen aktiven Flug für den aktuellen Zeitraffer-Schritt auswählen
+        let activeEntry = null;
+        for (let i = 0; i < entries.length; i++) {
+          const entry = entries[i];
+          if (entry.isCurrentDay && entry.progress > 0 && entry.progress < 1) {
+            activeEntry = entry;
+            break;
+          }
+        }
+
+        if (!activeEntry) return;
+
+        const { flight, progress } = activeEntry;
+        if (!mapBounds.intersects(flight.bounds)) return;
+
+        const limit = getPointLimit(flight.points.length, progress);
+        if (limit < 1) return;
+
+        const headPt = flight.points[limit - 1];
+        if (!mapBounds.contains([headPt.lat, headPt.lon])) return;
+
+        const sp = this._map.latLngToContainerPoint([headPt.lat, headPt.lon]);
+        const hx = sp.x * dpr;
+        const hy = sp.y * dpr;
+        const outerR = 16 * dpr;
+
+        // Diffundierter radialer Lichtschein ohne harte Kontur
+        ctx.save();
+        ctx.filter = 'none';
+        ctx.globalAlpha = 1.0;
+        ctx.globalCompositeOperation = 'source-over';
+
+        const radGrad = ctx.createRadialGradient(hx, hy, 0, hx, hy, outerR);
+        radGrad.addColorStop(0.00, 'rgba(255, 255, 255, 0.92)');
+        radGrad.addColorStop(0.18, 'rgba(255, 255, 255, 0.92)');
+        radGrad.addColorStop(0.45, 'rgba(185, 235, 255, 0.38)');
+        radGrad.addColorStop(1.00, 'rgba(185, 235, 255, 0)');
+
+        ctx.fillStyle = radGrad;
+        ctx.beginPath();
+        ctx.arc(hx, hy, outerR, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      },
+    });
+
+    // --------------------------------------------------------------------------
+    // 5. KARTEN-ARCHITEKTUR: OSM MIT 3D-RELIEF-SCHATTEN (STANDARD), TOPO & RELIEF
+    // --------------------------------------------------------------------------
+    const map = L.map('map', {
+      center: [47.655, 11.545],
+      zoom: 11,
+      zoomControl: false,
+    });
+
+    // Nicht-interaktiver Leaflet-Pane (zIndex: 240) für das 3D-Relief-Schummerungs-Overlay
+    const osmReliefPane = map.createPane('osmReliefShadePane');
+    osmReliefPane.style.zIndex = 240;
+    osmReliefPane.classList.add('leaflet-osm-relief-pane');
+
+    function attachTileErrorHandler(layer) {
+      layer.on('tileerror', (e) => {
+        if (e && e.tile) {
+          e.tile.style.opacity = '0';
+        }
+      });
+      return layer;
+    }
+
+    // 1. OSM (Standard): OpenStreetMap + plastisches 3D-Relief-Schummerungs-Overlay
+    const osmCombinedLayer = L.layerGroup([
+      attachTileErrorHandler(
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; OpenStreetMap-Mitwirkende | &copy; Esri Relief',
+          className: 'osm-base-tiles',
+          maxZoom: 19,
+        })
+      ),
+      attachTileErrorHandler(
+        L.tileLayer(
+          'https://server.arcgisonline.com/ArcGIS/rest/services/World_Shaded_Relief/MapServer/tile/{z}/{y}/{x}',
+          {
+            pane: 'osmReliefShadePane',
+            maxNativeZoom: 13,
+            maxZoom: 19,
+          }
+        )
+      ),
+    ]);
+
+    // 2. Topo: OpenTopoMap
+    const topoLayer = attachTileErrorHandler(
+      L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap, SRTM | &copy; OpenTopoMap',
+        className: 'topo-base-tiles',
+        maxZoom: 17,
+      })
+    );
+
+    // 3. Relief: Esri World Shaded Relief + CartoDB Voyager Orts-/Gipfelnamen-Overlay
+    const reliefLayer = L.layerGroup([
+      attachTileErrorHandler(
+        L.tileLayer(
+          'https://server.arcgisonline.com/ArcGIS/rest/services/World_Shaded_Relief/MapServer/tile/{z}/{y}/{x}',
+          {
+            attribution: '&copy; Esri World Shaded Relief | &copy; CARTO',
+            className: 'relief-base-tiles',
+            maxZoom: 19,
+            maxNativeZoom: 13,
+          }
+        )
+      ),
+      attachTileErrorHandler(
+        L.tileLayer(
+          'https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png',
+          {
+            className: 'relief-label-tiles',
+            subdomains: 'abcd',
+            maxZoom: 19,
+          }
+        )
+      ),
+    ]);
+
+    const mapStyleLayers = {
+      osm: osmCombinedLayer,
+      topo: topoLayer,
+      relief: reliefLayer,
+    };
+
+    mapStyleLayers.osm.addTo(map);
+    const flightCanvasLayer = new FlightCanvasLayer();
+    flightCanvasLayer.addTo(map);
+
+    function setMapStyle(styleKey) {
+      if (!mapStyleLayers[styleKey]) return;
+
+      if (state.mapStyle !== styleKey) {
+        map.removeLayer(mapStyleLayers[state.mapStyle]);
+        mapStyleLayers[styleKey].addTo(map);
+        state.mapStyle = styleKey;
+      }
+
+      document.documentElement.setAttribute('data-map-style', styleKey);
+
+      document.querySelectorAll('.map-style-btn').forEach((btn) => {
+        btn.classList.toggle('active', btn.dataset.mapStyle === styleKey);
+      });
+    }
+
+    function toggleDayNightTheme() {
+      const nextTheme = state.theme === 'light' ? 'dark' : 'light';
+      state.theme = nextTheme;
+      document.documentElement.setAttribute('data-theme', nextTheme);
+
+      const isDark = nextTheme === 'dark';
+      const switchBtn = document.getElementById('themeSwitchBtn');
+      if (switchBtn) {
+        switchBtn.setAttribute('aria-checked', String(isDark));
+      }
+      document.getElementById('thumbIconSun').classList.toggle('hidden', isDark);
+      document.getElementById('thumbIconMoon').classList.toggle('hidden', !isDark);
+
+      glassPhysics.targetBoost = 1.0;
+      wakeGlassReflection(650);
+      flightCanvasLayer._scheduleRedraw();
+    }
+
+    // --------------------------------------------------------------------------
+    // 6. EREIGNISGESTEUERTE SPRING-DAMPER-GLASREFLEXION (ZERO-IDLE-CPU)
+    // --------------------------------------------------------------------------
+    const glassContainers = Array.from(document.querySelectorAll('.liquid-glass'));
+
+    const glassPhysics = {
+      reflX: 32,
+      reflY: 24,
+      reflAngle: 124,
+      edgeAngle: 132,
+      boost: 0,
+
+      vReflX: 0,
+      vReflY: 0,
+      vReflAngle: 0,
+      vEdgeAngle: 0,
+      vBoost: 0,
+
+      targetReflX: 32,
+      targetReflY: 24,
+      targetReflAngle: 124,
+      targetEdgeAngle: 132,
+      targetBoost: 0,
+
+      lastProjPoint: null,
+      lastZoom: map.getZoom(),
+      lastTime: 0,
+      activeUntil: 0,
+      rafId: null,
+    };
+
+    function clamp(v, min, max) {
+      return Math.max(min, Math.min(max, v));
+    }
+
+    function wakeGlassReflection(durationMs = 650) {
+      const now = performance.now();
+      glassPhysics.activeUntil = Math.max(glassPhysics.activeUntil, now + durationMs);
+      if (!glassPhysics.rafId) {
+        glassPhysics.lastTime = now;
+        glassPhysics.rafId = requestAnimationFrame(stepGlassReflection);
+      }
+    }
+
+    function handleMapOpticalMove() {
+      const zoom = map.getZoom();
+      const proj = map.project(map.getCenter(), zoom);
+
+      if (!glassPhysics.lastProjPoint) {
+        glassPhysics.lastProjPoint = proj;
+        glassPhysics.lastZoom = zoom;
+        wakeGlassReflection(650);
+        return;
+      }
+
+      const dx = proj.x - glassPhysics.lastProjPoint.x;
+      const dy = proj.y - glassPhysics.lastProjPoint.y;
+      const dz = zoom - glassPhysics.lastZoom;
+
+      glassPhysics.lastProjPoint = proj;
+      glassPhysics.lastZoom = zoom;
+
+      const motionMag = Math.hypot(dx, dy) * 0.06 + Math.abs(dz) * 0.85;
+      glassPhysics.targetBoost = clamp(Math.max(glassPhysics.targetBoost, motionMag), 0.25, 1.0);
+
+      glassPhysics.targetReflX = clamp(glassPhysics.targetReflX + dx * 0.28 + dz * 13, 5, 95);
+      glassPhysics.targetReflY = clamp(glassPhysics.targetReflY + dy * 0.28 - dz * 11, 5, 95);
+      glassPhysics.targetReflAngle += dx * 0.18 - dy * 0.14 + dz * 24;
+      glassPhysics.targetEdgeAngle += dx * 0.34 + dy * 0.28 + dz * 42;
+
+      wakeGlassReflection(650);
+    }
+
+    map.on('move', handleMapOpticalMove);
+    map.on('zoom', handleMapOpticalMove);
+    map.on('moveend', () => {
+      glassPhysics.targetBoost = 0;
+      wakeGlassReflection(650);
+    });
+    map.on('zoomend', () => {
+      glassPhysics.targetBoost = 0;
+      wakeGlassReflection(650);
+    });
+
+    window.addEventListener(
+      'pointermove',
+      (e) => {
+        const nx = e.clientX / Math.max(1, window.innerWidth);
+        const ny = e.clientY / Math.max(1, window.innerHeight);
+
+        glassPhysics.targetReflX = clamp(12 + nx * 76, 5, 95);
+        glassPhysics.targetReflY = clamp(12 + ny * 76, 5, 95);
+        glassPhysics.targetEdgeAngle += (nx - 0.5) * 1.4;
+        glassPhysics.targetBoost = 0.45;
+
+        wakeGlassReflection(550);
+      },
+      { passive: true }
+    );
+
+    function stepGlassReflection(now) {
+      const dt = Math.min(0.05, Math.max(0.001, (now - glassPhysics.lastTime) / 1000));
+      glassPhysics.lastTime = now;
+
+      glassPhysics.targetBoost = Math.max(0, glassPhysics.targetBoost - dt * 2.2);
+
+      const stiffness = 68;
+      const damping = 11.0;
+
+      function spring(curr, vel, target) {
+        const force = (target - curr) * stiffness;
+        const nextVel = (vel + force * dt) * Math.exp(-damping * dt);
+        const nextVal = curr + nextVel * dt;
+        return [nextVal, nextVel];
+      }
+
+      [glassPhysics.reflX, glassPhysics.vReflX] = spring(
+        glassPhysics.reflX,
+        glassPhysics.vReflX,
+        glassPhysics.targetReflX
+      );
+      [glassPhysics.reflY, glassPhysics.vReflY] = spring(
+        glassPhysics.reflY,
+        glassPhysics.vReflY,
+        glassPhysics.targetReflY
+      );
+      [glassPhysics.reflAngle, glassPhysics.vReflAngle] = spring(
+        glassPhysics.reflAngle,
+        glassPhysics.vReflAngle,
+        glassPhysics.targetReflAngle
+      );
+      [glassPhysics.edgeAngle, glassPhysics.vEdgeAngle] = spring(
+        glassPhysics.edgeAngle,
+        glassPhysics.vEdgeAngle,
+        glassPhysics.targetEdgeAngle
+      );
+      [glassPhysics.boost, glassPhysics.vBoost] = spring(
+        glassPhysics.boost,
+        glassPhysics.vBoost,
+        glassPhysics.targetBoost
+      );
+
+      const rx = `${glassPhysics.reflX.toFixed(1)}%`;
+      const ry = `${glassPhysics.reflY.toFixed(1)}%`;
+      const ra = `${glassPhysics.reflAngle.toFixed(1)}deg`;
+      const ea = `${glassPhysics.edgeAngle.toFixed(1)}deg`;
+      const sb = clamp(glassPhysics.boost, 0, 1).toFixed(3);
+
+      for (let i = 0; i < glassContainers.length; i++) {
+        const st = glassContainers[i].style;
+        st.setProperty('--refl-x', rx);
+        st.setProperty('--refl-y', ry);
+        st.setProperty('--refl-angle', ra);
+        st.setProperty('--edge-angle', ea);
+        st.setProperty('--sheen-boost', sb);
+      }
+
+      if (now < glassPhysics.activeUntil) {
+        glassPhysics.rafId = requestAnimationFrame(stepGlassReflection);
+      } else {
+        for (let i = 0; i < glassContainers.length; i++) {
+          glassContainers[i].style.setProperty('--sheen-boost', '0');
+        }
+        glassPhysics.rafId = null;
+      }
+    }
+
+    // --------------------------------------------------------------------------
+    // 7. TRACK HOVER- & TAP-INSPEKTION (OHNE WEISSE PUNKTE AUF DER KARTE)
+    // --------------------------------------------------------------------------
+    let hoveredPointInfo = null;
+    const tooltipEl = document.getElementById('trackTooltip');
+    const ttSite = document.getElementById('ttSite');
+    const ttDate = document.getElementById('ttDate');
+    const ttAlt = document.getElementById('ttAlt');
+    const ttVario = document.getElementById('ttVario');
+    const ttOverlap = document.getElementById('ttOverlap');
+
+    function inspectAtLatLng(latlng, clientX, clientY) {
+      const entries = getActiveRenderEntries();
+      if (entries.length === 0) {
+        hideTooltip();
+        return;
+      }
+
+      const cursor = map.latLngToContainerPoint(latlng);
+      const hitRadiusSq = 15 * 15;
+      let bestDistSq = hitRadiusSq;
+      let bestMatch = null;
+      const overlappingFlightIds = new Set();
+
+      for (let idx = 0; idx < entries.length; idx++) {
+        const { flight, progress } = entries[idx];
+        if (progress <= 0 || !flight.bounds.pad(0.08).contains(latlng)) continue;
+
+        const pts = flight.points;
+        const limit = getPointLimit(pts.length, progress);
+        const step = limit > 2500 ? 2 : 1;
+
+        for (let i = 0; i < limit; i += step) {
+          const sp = map.latLngToContainerPoint([pts[i].lat, pts[i].lon]);
+          const dx = sp.x - cursor.x;
+          const dy = sp.y - cursor.y;
+          const dSq = dx * dx + dy * dy;
+
+          if (dSq <= hitRadiusSq) {
+            overlappingFlightIds.add(flight.id);
+            if (dSq < bestDistSq) {
+              bestDistSq = dSq;
+              bestMatch = { flight, point: pts[i] };
+            }
+          }
+        }
+      }
+
+      if (bestMatch) {
+        hoveredPointInfo = bestMatch;
+
+        ttSite.textContent = bestMatch.flight.site;
+        ttDate.textContent = bestMatch.flight.dateDisplay;
+        ttAlt.textContent = `${Math.round(bestMatch.point.alt).toLocaleString('de-DE')} m`;
+
+        const v = bestMatch.point.vario;
+        const sign = v > 0.05 ? '+' : '';
+        ttVario.textContent = `${sign}${v.toFixed(1).replace('.', ',')} m/s`;
+        ttVario.style.color = getVarioColor(v);
+
+        if (overlappingFlightIds.size > 1) {
+          ttOverlap.textContent = `${overlappingFlightIds.size} überlagerte Flüge`;
+          ttOverlap.classList.remove('hidden');
+        } else {
+          ttOverlap.classList.add('hidden');
+        }
+
+        let left = clientX + 14;
+        let top = clientY + 14;
+        if (left + 220 > window.innerWidth) left = Math.max(12, clientX - 220);
+        if (top + 115 > window.innerHeight) top = Math.max(60, clientY - 115);
+
+        tooltipEl.style.left = `${left}px`;
+        tooltipEl.style.top = `${top}px`;
+        tooltipEl.classList.remove('hidden');
+      } else if (hoveredPointInfo) {
+        hideTooltip();
+      }
+    }
+
+    map.on('mousemove', (e) => {
+      inspectAtLatLng(e.latlng, e.originalEvent.clientX, e.originalEvent.clientY);
+    });
+
+    map.on('click', (e) => {
+      inspectAtLatLng(e.latlng, e.originalEvent.clientX, e.originalEvent.clientY);
+    });
+
+    map.on('mouseout', hideTooltip);
+
+    function hideTooltip() {
+      if (hoveredPointInfo !== null) {
+        hoveredPointInfo = null;
+        tooltipEl.classList.add('hidden');
+      }
+    }
+
+    // --------------------------------------------------------------------------
+    // 8. ZEITRAFFER-STEUERUNG (PLAY/PAUSE, SCRUBBER & TAGES-CHIPS)
+    // --------------------------------------------------------------------------
+    function startPlayback() {
+      const tl = state.timelapse;
+      if (tl.days.length === 0) return;
+
+      tl.isPlaying = true;
+      if (tl.showAllDays || (tl.currentDayIndex >= tl.days.length - 1 && tl.dayProgress >= 0.999)) {
+        tl.showAllDays = false;
+        tl.currentDayIndex = 0;
+        tl.dayProgress = 0.01;
+      } else if (tl.dayProgress >= 0.999) {
+        tl.dayProgress = 0.01;
+      }
+
+      tl.lastFrameTime = performance.now();
+      tl.lastDrawTime = 0;
+      syncTimelapseUI(true);
+      renderFlightsTable();
+      flightCanvasLayer.redraw();
+
+      if (tl.rafId) cancelAnimationFrame(tl.rafId);
+      tl.rafId = requestAnimationFrame(stepPlayback);
+    }
+
+    function stopPlayback() {
+      const tl = state.timelapse;
+      tl.isPlaying = false;
+      tl.lastFrameTime = null;
+      if (tl.rafId) {
+        cancelAnimationFrame(tl.rafId);
+        tl.rafId = null;
+      }
+      syncTimelapseUI(false);
+      // Sofort neu zeichnen, damit der Lichtschein beim Pausieren/Beenden verschwindet
+      flightCanvasLayer.redraw();
+    }
+
+    function togglePlayback() {
+      if (state.timelapse.isPlaying) stopPlayback();
+      else startPlayback();
+    }
+
+    function stepPlayback(now) {
+      const tl = state.timelapse;
+      if (!tl.isPlaying || tl.days.length === 0) return;
+
+      const dt = Math.min(0.1, (now - (tl.lastFrameTime || now)) / 1000);
+      tl.lastFrameTime = now;
+
+      const speed = SPEED_STEPS[tl.speedIdx];
+      tl.dayProgress += (dt * speed) / 1.45;
+
+      if (tl.dayProgress >= 1.0) {
+        if (tl.currentDayIndex < tl.days.length - 1) {
+          tl.currentDayIndex++;
+          tl.dayProgress = 0.01;
+          syncTimelapseUI(true);
+          renderFlightsTable();
+        } else {
+          tl.dayProgress = 1.0;
+          stopPlayback();
+          renderFlightsTable();
+          return;
+        }
+      }
+
+      const scrubber = document.getElementById('timelineScrubber');
+      const clampedProg = Math.min(1.0, tl.dayProgress);
+      scrubber.value = Math.round((tl.currentDayIndex + clampedProg) * 1000);
+
+      if (now - tl.lastDrawTime >= 28) {
+        tl.lastDrawTime = now;
+        flightCanvasLayer.redraw();
+      }
+
+      tl.rafId = requestAnimationFrame(stepPlayback);
+    }
+
+    function selectDay(dayIndex, scrollChip = true) {
+      const tl = state.timelapse;
+      if (tl.days.length === 0) return;
+
+      tl.showAllDays = false;
+      tl.currentDayIndex = Math.max(0, Math.min(tl.days.length - 1, dayIndex));
+      tl.dayProgress = tl.isPlaying ? 0.01 : 1.0;
+
+      syncTimelapseUI(scrollChip);
+      renderFlightsTable();
+      flightCanvasLayer.redraw();
+    }
+
+    function showAllDays() {
+      const tl = state.timelapse;
+      stopPlayback();
+      tl.showAllDays = true;
+      tl.dayProgress = 1.0;
+
+      syncTimelapseUI(false);
+      renderFlightsTable();
+      flightCanvasLayer.redraw();
+    }
+
+    function syncTimelapseUI(scrollChip = false) {
+      const tl = state.timelapse;
+      const dockWrapper = document.getElementById('timelapseDockWrapper');
+      const hasDays = tl.days.length > 0;
+
+      dockWrapper.classList.toggle('hidden', !hasDays);
+      if (!hasDays) return;
+
+      document.getElementById('playPauseIcon').textContent = tl.isPlaying ? '⏸' : '▶';
+      document.getElementById('playPauseLabel').textContent = tl.isPlaying ? 'Pause' : 'Play';
+
+      const scrubber = document.getElementById('timelineScrubber');
+      const maxVal = tl.days.length * 1000;
+      scrubber.min = 0;
+      scrubber.max = maxVal;
+
+      const dateText = document.getElementById('dockDateText');
+      const subText = document.getElementById('dockSubText');
+
+      if (tl.showAllDays) {
+        scrubber.value = maxVal;
+        const totalFlights = tl.days.reduce((acc, d) => acc + d.flights.length, 0);
+        dateText.textContent = 'Alle Tage';
+        subText.textContent = `${totalFlights} ${totalFlights === 1 ? 'Flug' : 'Flüge'} · ${tl.days.length} ${tl.days.length === 1 ? 'Tag' : 'Tage'}`;
+      } else {
+        const clampedProg = Math.min(1.0, tl.dayProgress);
+        scrubber.value = Math.round((tl.currentDayIndex + clampedProg) * 1000);
+        const dayObj = tl.days[tl.currentDayIndex];
+        const count = dayObj.flights.length;
+        dateText.textContent = dayObj.dateDisplay;
+        subText.textContent = `${count} ${count === 1 ? 'Flug' : 'Flüge'} · Tag ${tl.currentDayIndex + 1}/${tl.days.length}`;
+      }
+
+      const chipsRow = document.getElementById('dayChipsRow');
+      chipsRow.innerHTML = '';
+
+      const allChip = document.createElement('button');
+      allChip.type = 'button';
+      allChip.className = `day-pill${tl.showAllDays ? ' is-active' : ''}`;
+      allChip.dataset.action = 'all';
+      allChip.textContent = 'Alle';
+      chipsRow.appendChild(allChip);
+
+      tl.days.forEach((dayObj, idx) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'day-pill tabular';
+        btn.dataset.dayIndex = idx;
+
+        if (!tl.showAllDays) {
+          if (idx === tl.currentDayIndex) btn.classList.add('is-active');
+          else if (tl.mode === 'cumulative' && idx < tl.currentDayIndex) btn.classList.add('is-past');
+        }
+
+        btn.innerHTML = `
+          <span>${escapeHtml(dayObj.shortLabel)}</span>
+          <span class="day-pill-count">${dayObj.flights.length}</span>
+        `;
+        chipsRow.appendChild(btn);
+      });
+
+      if (scrollChip && !tl.showAllDays) {
+        const activeBtn = chipsRow.querySelector('.day-pill.is-active');
+        if (activeBtn) {
+          activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        }
+      }
+    }
+
+    // --------------------------------------------------------------------------
+    // 9. FLÜGE-POPOVER & SORTIERBARE TABELLE
+    // --------------------------------------------------------------------------
+    function formatDistGerman(km) {
+      return `${km.toFixed(1).replace('.', ',')} km`;
+    }
+
+    function updateLegendMaxLabel(maxOverlap) {
+      const lbl = document.getElementById('legendHeatmapMaxLbl');
+      if (!lbl) return;
+      if (maxOverlap <= 1) lbl.textContent = '1 Flug';
+      else lbl.textContent = `${maxOverlap} Flüge`;
+    }
+
+    function fitMapToVisible() {
+      const visible = state.flights.filter((f) => f.visible);
+      if (visible.length === 0) return;
+
+      const bounds = L.latLngBounds(visible[0].bounds.getSouthWest(), visible[0].bounds.getNorthEast());
+      for (let i = 1; i < visible.length; i++) {
+        bounds.extend(visible[i].bounds);
+      }
+      map.fitBounds(bounds, { padding: [54, 54], maxZoom: 13 });
+    }
+
+    function renderFlightsTable() {
+      const total = state.flights.length;
+      const visible = state.flights.filter((f) => f.visible);
+      const visCount = visible.length;
+
+      document.getElementById('flightsBadgeCount').textContent = `${visCount}/${total}`;
+      document.getElementById('popoverCountPill').textContent = `${visCount}/${total}`;
+      document.getElementById('fitBoundsBtn').disabled = visCount === 0;
+
+      const totalDist = visible.reduce((sum, f) => sum + f.distanceKm, 0);
+      document.getElementById('popoverTotalDist').textContent = formatDistGerman(totalDist);
+
+      const emptyCard = document.getElementById('emptyWelcomeCard');
+      const clearAllBtn = document.getElementById('clearAllBtn');
+      const masterChk = document.getElementById('masterCheckbox');
+      const tbody = document.getElementById('flightsTableBody');
+
+      if (total === 0) {
+        emptyCard.classList.remove('hidden');
+        clearAllBtn.classList.add('hidden');
+        masterChk.checked = false;
+        masterChk.indeterminate = false;
+        masterChk.disabled = true;
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="5" style="padding:24px 14px; text-align:center; color:var(--text-secondary); font-size:12.5px;">
+              Keine Flüge vorhanden.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      emptyCard.classList.add('hidden');
+      clearAllBtn.classList.remove('hidden');
+      masterChk.disabled = false;
+
+      if (visCount === 0) {
+        masterChk.checked = false;
+        masterChk.indeterminate = false;
+      } else if (visCount === total) {
+        masterChk.checked = true;
+        masterChk.indeterminate = false;
+      } else {
+        masterChk.checked = false;
+        masterChk.indeterminate = true;
+      }
+
+      const tl = state.timelapse;
+      const activeDayKey =
+        !tl.showAllDays && tl.days[tl.currentDayIndex] ? tl.days[tl.currentDayIndex].dateKey : null;
+
+      const sorted = [...state.flights].sort((a, b) => {
+        let cmp = 0;
+        if (state.sortBy === 'date') cmp = a.dateTimestamp - b.dateTimestamp;
+        else if (state.sortBy === 'site') cmp = a.site.localeCompare(b.site, 'de', { sensitivity: 'base' });
+        else if (state.sortBy === 'distance') cmp = a.distanceKm - b.distanceKm;
+        return state.sortDir === 'asc' ? cmp : -cmp;
+      });
+
+      tbody.innerHTML = '';
+
+      sorted.forEach((f) => {
+        const isCurrentDayFlight = f.visible && activeDayKey && f.dateKey === activeDayKey;
+        const tr = document.createElement('tr');
+        if (!f.visible) tr.classList.add('is-unchecked');
+        else if (isCurrentDayFlight) tr.classList.add('is-active-day');
+
+        const subParts = [];
+        if (f.pilot) subParts.push(f.pilot);
+        subParts.push(`Max. ${Math.round(f.maxAlt).toLocaleString('de-DE')} m`);
+        if (f.durationText) subParts.push(f.durationText);
+
+        tr.innerHTML = `
+          <td class="col-chk">
+            <input
+              type="checkbox"
+              class="ios-checkbox"
+              data-flight-id="${f.id}"
+              ${f.visible ? 'checked' : ''}
+              aria-label="Flug ${escapeHtml(f.site)} am ${escapeHtml(f.dateDisplay)} umschalten"
+            />
+          </td>
+          <td class="tabular" style="white-space:nowrap;">${escapeHtml(f.dateDisplay)}</td>
+          <td class="flight-site-cell">
+            <div class="flight-site-title" title="${escapeHtml(f.site)}">
+              ${isCurrentDayFlight ? '<span class="day-match-dot" title="Aktiver Tag im Zeitraffer"></span>' : ''}
+              <span style="overflow:hidden; text-overflow:ellipsis;">${escapeHtml(f.site)}</span>
+            </div>
+            <div class="flight-site-sub">${escapeHtml(subParts.join(' · '))}</div>
+          </td>
+          <td class="col-dist tabular">${formatDistGerman(f.distanceKm)}</td>
+          <td class="col-del">
+            <button type="button" class="row-del-btn" data-remove-id="${f.id}" title="Entfernen" aria-label="Flug entfernen">&times;</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      ['date', 'site', 'distance'].forEach((col) => {
+        const el = document.getElementById(`sortIcon-${col}`);
+        if (!el) return;
+        if (state.sortBy === col) {
+          el.textContent = state.sortDir === 'asc' ? '↑' : '↓';
+          el.style.color = 'var(--accent)';
+        } else {
+          el.textContent = '↕';
+          el.style.color = 'var(--text-secondary)';
+        }
+      });
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function showToast(msg) {
+      const stack = document.getElementById('toastStack');
+      const el = document.createElement('div');
+      el.className = 'ios-toast liquid-glass liquid-glass-elevated';
+      el.innerHTML = `<span>${escapeHtml(msg)}</span>`;
+      stack.appendChild(el);
+      setTimeout(() => {
+        el.style.opacity = '0';
+        el.style.transform = 'translateY(-6px)';
+        el.style.transition = 'all 0.2s ease';
+        setTimeout(() => el.remove(), 220);
+      }, 2800);
+    }
+
+    // --------------------------------------------------------------------------
+    // 10. DATEI-UPLOAD & 10 DETAILREICHE ALPEN-BEISPIELFLÜGE
+    //     (BRAUNECK, BENEDIKTENWAND, LENGGRIES, HERZOGSTAND & WALLBERG)
+    // --------------------------------------------------------------------------
+    async function processUploadedFiles(fileList) {
+      const files = Array.from(fileList || []);
+      if (files.length === 0) return;
+
+      let ok = 0, fail = 0;
+      for (const file of files) {
+        try {
+          const text = await file.text();
+          const flight = parseIGCFile(file.name, text);
+          state.flights.push(flight);
+          ok++;
+        } catch (err) {
+          console.error(err);
+          fail++;
+        }
+      }
+
+      if (ok > 0) {
+        stopPlayback();
+        state.timelapse.showAllDays = true;
+        state.timelapse.dayProgress = 1.0;
+        rebuildTimelapseDays();
+
+        syncTimelapseUI(false);
+        renderFlightsTable();
+        flightCanvasLayer.redraw();
+        fitMapToVisible();
+
+        showToast(ok === 1 ? '1 IGC-Flug geladen' : `${ok} IGC-Flüge geladen`);
+      }
+
+      if (fail > 0) {
+        showToast(fail === 1 ? '1 Datei ungültig' : `${fail} Dateien ungültig`);
+      }
+    }
+
+    function formatIGCCoord(lat, lon) {
+      const latH = lat >= 0 ? 'N' : 'S';
+      const aLat = Math.abs(lat);
+      const latD = Math.floor(aLat);
+      const latM = Math.floor((aLat - latD) * 60);
+      const latT = Math.min(999, Math.round(((aLat - latD) * 60 - latM) * 1000));
+
+      const lonH = lon >= 0 ? 'E' : 'W';
+      const aLon = Math.abs(lon);
+      const lonD = Math.floor(aLon);
+      const lonM = Math.floor((aLon - lonD) * 60);
+      const lonT = Math.min(999, Math.round(((aLon - lonD) * 60 - lonM) * 1000));
+
+      return (
+        String(latD).padStart(2, '0') +
+        String(latM).padStart(2, '0') +
+        String(latT).padStart(3, '0') +
+        latH +
+        String(lonD).padStart(3, '0') +
+        String(lonM).padStart(2, '0') +
+        String(lonT).padStart(3, '0') +
+        lonH
+      );
+    }
+
+    function createSyntheticIGC({ dateDDMMYY, site, pilot, startHourUTC, waypoints }) {
+      const lines = [
+        'AXCT001 PARAGLIDING LOGGER',
+        `HFDTE${dateDDMMYY}`,
+        `HFPLTPILOTINCHARGE:${pilot}`,
+        `HFSITSITE:${site}`,
+      ];
+
+      let sec = startHourUTC * 3600;
+      const stepSec = 4;
+
+      for (let w = 0; w < waypoints.length - 1; w++) {
+        const p0 = waypoints[w];
+        const p1 = { ...waypoints[w + 1] };
+        const distKm = haversineKm(p0.lat, p0.lon, p1.lat, p1.lon);
+        const travelSec = Math.max(64, Math.round((distKm / 36) * 3600));
+        const steps = Math.max(18, Math.floor(travelSec / stepSec));
+
+        for (let s = 0; s < steps; s++) {
+          const f = s / steps;
+          const ease = f * f * (3 - 2 * f);
+          const lat =
+            p0.lat +
+            (p1.lat - p0.lat) * f +
+            Math.sin(ease * Math.PI * 1.5 + w * 0.7) * 0.00065;
+          const lon =
+            p0.lon +
+            (p1.lon - p0.lon) * f +
+            Math.cos(ease * Math.PI * 1.5 + w * 0.7) * 0.00095;
+          const alt = Math.max(680, Math.round(p0.alt + (p1.alt - p0.alt) * f));
+
+          const ts =
+            String(Math.floor(sec / 3600) % 24).padStart(2, '0') +
+            String(Math.floor((sec % 3600) / 60)).padStart(2, '0') +
+            String(sec % 60).padStart(2, '0');
+          const altStr = String(alt).padStart(5, '0');
+          lines.push(`B${ts}${formatIGCCoord(lat, lon)}A${altStr}${altStr}`);
+          sec += stepSec;
+        }
+
+        if (p1.turns && p1.gain) {
+          const ptsPerTurn = 16;
+          const circleSteps = p1.turns * ptsPerTurn;
+          for (let c = 0; c < circleSteps; c++) {
+            const ang = (c / ptsPerTurn) * Math.PI * 2;
+            const cf = c / circleSteps;
+            const radiusLat = 0.00115 + Math.sin(cf * Math.PI) * 0.00022;
+            const radiusLon = 0.00165 + Math.sin(cf * Math.PI) * 0.00030;
+            const lat = p1.lat + Math.sin(ang) * radiusLat + cf * 0.00085;
+            const lon = p1.lon + Math.cos(ang) * radiusLon + cf * 0.00115;
+            const alt = Math.round(p1.alt + cf * p1.gain);
+
+            const ts =
+              String(Math.floor(sec / 3600) % 24).padStart(2, '0') +
+              String(Math.floor((sec % 3600) / 60)).padStart(2, '0') +
+              String(sec % 60).padStart(2, '0');
+            const altStr = String(alt).padStart(5, '0');
+            lines.push(`B${ts}${formatIGCCoord(lat, lon)}A${altStr}${altStr}`);
+            sec += stepSec;
+          }
+          waypoints[w + 1].alt += p1.gain;
+        }
+      }
+      return lines.join('\n');
+    }
+
+    function loadSampleFlights(silent = false) {
+      const specs = [
+        // Tag 1: 12.09.2026 (2 Flüge)
+        {
+          filename: '2026-09-12_Brauneck_Benediktenwand_Lenggries.igc',
+          dateDDMMYY: '120926',
+          site: 'Brauneck Garland',
+          pilot: 'Lukas Berger',
+          startHourUTC: 10,
+          waypoints: [
+            { lat: 47.6632, lon: 11.5255, alt: 1540 },
+            { lat: 47.6605, lon: 11.5140, alt: 1490, turns: 3, gain: 420 },
+            { lat: 47.6540, lon: 11.4820, alt: 1750 },
+            { lat: 47.6532, lon: 11.4660, alt: 1690, turns: 3, gain: 380 },
+            { lat: 47.6607, lon: 11.5143, alt: 1620 },
+            { lat: 47.6742, lon: 11.5645, alt: 690 },
+          ],
+        },
+        {
+          filename: '2026-09-12_Brauneck_Hausbart_Lenggries.igc',
+          dateDDMMYY: '120926',
+          site: 'Brauneck Gipfel',
+          pilot: 'Elena Huber',
+          startHourUTC: 11,
+          waypoints: [
+            { lat: 47.6645, lon: 11.5220, alt: 1555 },
+            { lat: 47.6606, lon: 11.5142, alt: 1480, turns: 4, gain: 460 },
+            { lat: 47.6710, lon: 11.5360, alt: 1580, turns: 2, gain: 260 },
+            { lat: 47.6745, lon: 11.5640, alt: 690 },
+          ],
+        },
+        // Tag 2: 15.09.2026 (2 Flüge)
+        {
+          filename: '2026-09-15_Herzogstand_Benediktenwand_Lenggries.igc',
+          dateDDMMYY: '150926',
+          site: 'Herzogstand',
+          pilot: 'Sophie Leitner',
+          startHourUTC: 10,
+          waypoints: [
+            { lat: 47.6115, lon: 11.3075, alt: 1580 },
+            { lat: 47.6160, lon: 11.3240, alt: 1510, turns: 3, gain: 470 },
+            { lat: 47.6380, lon: 11.4020, alt: 1740, turns: 2, gain: 310 },
+            { lat: 47.6531, lon: 11.4658, alt: 1790, turns: 3, gain: 390 },
+            { lat: 47.6540, lon: 11.4822, alt: 1850 },
+            { lat: 47.6606, lon: 11.5141, alt: 1620 },
+            { lat: 47.6741, lon: 11.5646, alt: 690 },
+          ],
+        },
+        {
+          filename: '2026-09-15_Herzogstand_Jochberg_Benediktenwand.igc',
+          dateDDMMYY: '150926',
+          site: 'Herzogstand',
+          pilot: 'Markus Lindner',
+          startHourUTC: 11,
+          waypoints: [
+            { lat: 47.6118, lon: 11.3080, alt: 1580 },
+            { lat: 47.6162, lon: 11.3245, alt: 1500, turns: 3, gain: 450 },
+            { lat: 47.6345, lon: 11.3850, alt: 1690, turns: 2, gain: 340 },
+            { lat: 47.6532, lon: 11.4660, alt: 1760 },
+            { lat: 47.6605, lon: 11.5140, alt: 1590 },
+            { lat: 47.6743, lon: 11.5644, alt: 690 },
+          ],
+        },
+        // Tag 3: 19.09.2026 (2 Flüge)
+        {
+          filename: '2026-09-19_Wallberg_Hirschberg_Lenggries.igc',
+          dateDDMMYY: '190926',
+          site: 'Wallberg',
+          pilot: 'Jonas Reiter',
+          startHourUTC: 10,
+          waypoints: [
+            { lat: 47.6655, lon: 11.7955, alt: 1620 },
+            { lat: 47.6620, lon: 11.7780, alt: 1560, turns: 3, gain: 460 },
+            { lat: 47.6640, lon: 11.7120, alt: 1760, turns: 3, gain: 390 },
+            { lat: 47.6680, lon: 11.6350, alt: 1690, turns: 2, gain: 290 },
+            { lat: 47.6742, lon: 11.5645, alt: 690 },
+          ],
+        },
+        {
+          filename: '2026-09-19_Brauneck_Benediktenwand_Soaring.igc',
+          dateDDMMYY: '190926',
+          site: 'Brauneck Gipfel',
+          pilot: 'Clara Wagner',
+          startHourUTC: 12,
+          waypoints: [
+            { lat: 47.6644, lon: 11.5222, alt: 1555 },
+            { lat: 47.6605, lon: 11.5140, alt: 1495, turns: 3, gain: 410 },
+            { lat: 47.6540, lon: 11.4822, alt: 1750 },
+            { lat: 47.6531, lon: 11.4659, alt: 1670, turns: 3, gain: 390 },
+            { lat: 47.6541, lon: 11.4820, alt: 1840 },
+            { lat: 47.6607, lon: 11.5143, alt: 1610 },
+            { lat: 47.6743, lon: 11.5644, alt: 690 },
+          ],
+        },
+        // Tag 4: 24.09.2026 (2 Flüge)
+        {
+          filename: '2026-09-24_Wallberg_Lenggries_Brauneck.igc',
+          dateDDMMYY: '240926',
+          site: 'Wallberg',
+          pilot: 'Lukas Berger',
+          startHourUTC: 10,
+          waypoints: [
+            { lat: 47.6652, lon: 11.7950, alt: 1620 },
+            { lat: 47.6621, lon: 11.7782, alt: 1550, turns: 4, gain: 490 },
+            { lat: 47.6642, lon: 11.7115, alt: 1810, turns: 2, gain: 330 },
+            { lat: 47.6685, lon: 11.6340, alt: 1760, turns: 2, gain: 280 },
+            { lat: 47.6606, lon: 11.5142, alt: 1680, turns: 3, gain: 390 },
+            { lat: 47.6740, lon: 11.5648, alt: 690 },
+          ],
+        },
+        {
+          filename: '2026-09-24_Brauneck_Latschenkopf_Lenggries.igc',
+          dateDDMMYY: '240926',
+          site: 'Brauneck Garland',
+          pilot: 'Tobias Mai',
+          startHourUTC: 12,
+          waypoints: [
+            { lat: 47.6632, lon: 11.5254, alt: 1540 },
+            { lat: 47.6605, lon: 11.5140, alt: 1480, turns: 4, gain: 470 },
+            { lat: 47.6539, lon: 11.4821, alt: 1790 },
+            { lat: 47.6607, lon: 11.5144, alt: 1590 },
+            { lat: 47.6742, lon: 11.5645, alt: 690 },
+          ],
+        },
+        // Tag 5: 03.10.2026 (2 Flüge)
+        {
+          filename: '2026-10-03_Herbstklassiker_Herzogstand_Brauneck.igc',
+          dateDDMMYY: '031026',
+          site: 'Herzogstand',
+          pilot: 'Sophie Leitner',
+          startHourUTC: 10,
+          waypoints: [
+            { lat: 47.6116, lon: 11.3078, alt: 1580 },
+            { lat: 47.6161, lon: 11.3242, alt: 1515, turns: 3, gain: 460 },
+            { lat: 47.6532, lon: 11.4660, alt: 1750, turns: 3, gain: 400 },
+            { lat: 47.6539, lon: 11.4823, alt: 1830 },
+            { lat: 47.6606, lon: 11.5142, alt: 1620 },
+            { lat: 47.6741, lon: 11.5647, alt: 690 },
+          ],
+        },
+        {
+          filename: '2026-10-03_Brauneck_Abendflug_Lenggries.igc',
+          dateDDMMYY: '031026',
+          site: 'Brauneck Gipfel',
+          pilot: 'Elena Huber',
+          startHourUTC: 13,
+          waypoints: [
+            { lat: 47.6645, lon: 11.5221, alt: 1555 },
+            { lat: 47.6606, lon: 11.5141, alt: 1500, turns: 3, gain: 370 },
+            { lat: 47.6540, lon: 11.4822, alt: 1710 },
+            { lat: 47.6608, lon: 11.5145, alt: 1540 },
+            { lat: 47.6743, lon: 11.5643, alt: 690 },
+          ],
+        },
+      ];
+
+      specs.forEach((s) => {
+        const igc = createSyntheticIGC(s);
+        state.flights.push(parseIGCFile(s.filename, igc));
+      });
+
+      stopPlayback();
+      state.timelapse.showAllDays = true;
+      state.timelapse.dayProgress = 1.0;
+      rebuildTimelapseDays();
+
+      syncTimelapseUI(false);
+      renderFlightsTable();
+      flightCanvasLayer.redraw();
+      fitMapToVisible();
+
+      if (!silent) {
+        showToast('10 Alpen-Beispielflüge über 5 Flugtage geladen');
+      }
+    }
+
+    // --------------------------------------------------------------------------
+    // 11. EVENT-LISTENER & INTERAKTIONEN
+    // --------------------------------------------------------------------------
+    const flightsPopover = document.getElementById('flightsPopover');
+    const flightsPopoverBtn = document.getElementById('flightsPopoverBtn');
+
+    function setFlightsPopoverOpen(open) {
+      state.flightsPopoverOpen = open;
+      flightsPopover.classList.toggle('popover-hidden', !open);
+      flightsPopoverBtn.classList.toggle('is-active', open);
+      flightsPopoverBtn.setAttribute('aria-expanded', String(open));
+      if (open) {
+        glassPhysics.targetBoost = 0.7;
+        wakeGlassReflection(550);
+      }
+    }
+
+    flightsPopoverBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      setFlightsPopoverOpen(!state.flightsPopoverOpen);
+    });
+
+    document.getElementById('closePopoverBtn').addEventListener('click', () => {
+      setFlightsPopoverOpen(false);
+    });
+
+    document.addEventListener('click', (e) => {
+      if (state.flightsPopoverOpen && !flightsPopover.contains(e.target) && !flightsPopoverBtn.contains(e.target)) {
+        setFlightsPopoverOpen(false);
+      }
+    });
+
+    // Kartenstil-Auswahl (OSM | Topo | Relief)
+    document.querySelectorAll('.map-style-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        setMapStyle(btn.dataset.mapStyle);
+      });
+    });
+
+    // Physischer Tag/Nacht-Glas-Schalter
+    document.getElementById('themeSwitchBtn').addEventListener('click', toggleDayNightTheme);
+
+    // Upload, Zentrieren (im Flüge-Popover) & Beispielflüge
+    const igcFileInput = document.getElementById('igcFileInput');
+    document.getElementById('uploadBtn').addEventListener('click', () => igcFileInput.click());
+    document.getElementById('welcomeUploadBtn').addEventListener('click', () => igcFileInput.click());
+    document.getElementById('welcomeSampleBtn').addEventListener('click', () => loadSampleFlights(false));
+    document.getElementById('reloadSamplesBtn').addEventListener('click', () => loadSampleFlights(false));
+    document.getElementById('fitBoundsBtn').addEventListener('click', fitMapToVisible);
+
+    igcFileInput.addEventListener('change', (e) => {
+      processUploadedFiles(e.target.files);
+      igcFileInput.value = '';
+    });
+
+    // Darstellungsmodus: Heatmap vs. Steigrate
+    const vizSegmented = document.getElementById('vizSegmented');
+    const modeHeatmapBtn = document.getElementById('modeHeatmapBtn');
+    const modeVarioBtn = document.getElementById('modeVarioBtn');
+    const legendHeatmapView = document.getElementById('legendHeatmapView');
+    const legendVarioView = document.getElementById('legendVarioView');
+
+    function setVizMode(mode) {
+      state.vizMode = mode;
+      const isHeatmap = mode === 'heatmap';
+      vizSegmented.setAttribute('data-index', isHeatmap ? '0' : '1');
+      modeHeatmapBtn.classList.toggle('active', isHeatmap);
+      modeVarioBtn.classList.toggle('active', !isHeatmap);
+      legendHeatmapView.classList.toggle('hidden', !isHeatmap);
+      legendVarioView.classList.toggle('hidden', isHeatmap);
+      flightCanvasLayer.redraw();
+    }
+
+    modeHeatmapBtn.addEventListener('click', () => setVizMode('heatmap'));
+    modeVarioBtn.addEventListener('click', () => setVizMode('vario'));
+
+    // Zeitraffer-Steuerung
+    document.getElementById('playPauseBtn').addEventListener('click', togglePlayback);
+
+    const tlModeSegmented = document.getElementById('tlModeSegmented');
+    const tlModeCumulativeBtn = document.getElementById('tlModeCumulativeBtn');
+    const tlModeSingleBtn = document.getElementById('tlModeSingleBtn');
+
+    function setTimelapseMode(mode) {
+      state.timelapse.mode = mode;
+      const isCum = mode === 'cumulative';
+      tlModeSegmented.setAttribute('data-index', isCum ? '0' : '1');
+      tlModeCumulativeBtn.classList.toggle('active', isCum);
+      tlModeSingleBtn.classList.toggle('active', !isCum);
+      syncTimelapseUI(false);
+      flightCanvasLayer.redraw();
+    }
+
+    tlModeCumulativeBtn.addEventListener('click', () => setTimelapseMode('cumulative'));
+    tlModeSingleBtn.addEventListener('click', () => setTimelapseMode('single'));
+
+    const speedCycleBtn = document.getElementById('speedCycleBtn');
+    speedCycleBtn.addEventListener('click', () => {
+      state.timelapse.speedIdx = (state.timelapse.speedIdx + 1) % SPEED_STEPS.length;
+      speedCycleBtn.textContent = `${SPEED_STEPS[state.timelapse.speedIdx]}x`;
+    });
+
+    document.getElementById('timelineScrubber').addEventListener('input', (e) => {
+      const tl = state.timelapse;
+      if (tl.days.length === 0) return;
+
+      stopPlayback();
+      const val = parseInt(e.target.value, 10) || 0;
+      const maxVal = tl.days.length * 1000;
+
+      if (val >= maxVal) {
+        tl.showAllDays = false;
+        tl.currentDayIndex = tl.days.length - 1;
+        tl.dayProgress = 1.0;
+      } else {
+        tl.showAllDays = false;
+        const rawDay = Math.floor(val / 1000);
+        const rem = (val % 1000) / 1000;
+        if (val > 0 && rem === 0) {
+          tl.currentDayIndex = Math.min(tl.days.length - 1, rawDay - 1);
+          tl.dayProgress = 1.0;
+        } else {
+          tl.currentDayIndex = Math.min(tl.days.length - 1, rawDay);
+          tl.dayProgress = Math.max(0.02, rem);
+        }
+      }
+
+      syncTimelapseUI(true);
+      renderFlightsTable();
+      flightCanvasLayer.redraw();
+    });
+
+    document.getElementById('dayChipsRow').addEventListener('click', (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      if (btn.dataset.action === 'all') {
+        showAllDays();
+      } else if (btn.dataset.dayIndex !== undefined) {
+        selectDay(parseInt(btn.dataset.dayIndex, 10), false);
+      }
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') {
+        const tag = document.activeElement ? document.activeElement.tagName : '';
+        if (tag === 'INPUT' || tag === 'BUTTON') return;
+        if (state.timelapse.days.length > 0) {
+          e.preventDefault();
+          togglePlayback();
+        }
+      } else if (e.code === 'Escape' && state.flightsPopoverOpen) {
+        setFlightsPopoverOpen(false);
+      }
+    });
+
+    // Tabellen-Checkboxen & Aktionen im Flüge-Popover
+    document.getElementById('masterCheckbox').addEventListener('change', (e) => {
+      const checked = e.target.checked;
+      const prevKey =
+        !state.timelapse.showAllDays && state.timelapse.days[state.timelapse.currentDayIndex]
+          ? state.timelapse.days[state.timelapse.currentDayIndex].dateKey
+          : null;
+
+      state.flights.forEach((f) => {
+        f.visible = checked;
+      });
+
+      rebuildTimelapseDays(prevKey);
+      syncTimelapseUI(false);
+      renderFlightsTable();
+      flightCanvasLayer.redraw();
+    });
+
+    document.getElementById('flightsTableBody').addEventListener('change', (e) => {
+      const chk = e.target.closest('input[data-flight-id]');
+      if (!chk) return;
+
+      const prevKey =
+        !state.timelapse.showAllDays && state.timelapse.days[state.timelapse.currentDayIndex]
+          ? state.timelapse.days[state.timelapse.currentDayIndex].dateKey
+          : null;
+
+      const id = Number(chk.dataset.flightId);
+      const flight = state.flights.find((f) => f.id === id);
+      if (flight) {
+        flight.visible = chk.checked;
+        rebuildTimelapseDays(prevKey);
+        syncTimelapseUI(false);
+        renderFlightsTable();
+        flightCanvasLayer.redraw();
+      }
+    });
+
+    document.getElementById('flightsTableBody').addEventListener('click', (e) => {
+      const delBtn = e.target.closest('button[data-remove-id]');
+      if (!delBtn) return;
+
+      const prevKey =
+        !state.timelapse.showAllDays && state.timelapse.days[state.timelapse.currentDayIndex]
+          ? state.timelapse.days[state.timelapse.currentDayIndex].dateKey
+          : null;
+
+      const id = Number(delBtn.dataset.removeId);
+      state.flights = state.flights.filter((f) => f.id !== id);
+      hideTooltip();
+
+      rebuildTimelapseDays(prevKey);
+      syncTimelapseUI(false);
+      renderFlightsTable();
+      flightCanvasLayer.redraw();
+    });
+
+    document.getElementById('clearAllBtn').addEventListener('click', () => {
+      stopPlayback();
+      state.flights = [];
+      state.timelapse.days = [];
+      state.timelapse.showAllDays = true;
+      state.timelapse.currentDayIndex = 0;
+      state.timelapse.dayProgress = 1.0;
+
+      hideTooltip();
+      syncTimelapseUI(false);
+      renderFlightsTable();
+      flightCanvasLayer.redraw();
+      setFlightsPopoverOpen(false);
+      showToast('Alle Flüge zurückgesetzt');
+    });
+
+    document.querySelectorAll('th[data-sort]').forEach((th) => {
+      th.addEventListener('click', () => {
+        const col = th.dataset.sort;
+        if (state.sortBy === col) {
+          state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+          state.sortBy = col;
+          state.sortDir = col === 'site' ? 'asc' : 'desc';
+        }
+        renderFlightsTable();
+      });
+    });
+
+    // Globales Drag & Drop über das gesamte Fenster
+    const dropOverlay = document.getElementById('dropOverlay');
+    let dragCounter = 0;
+
+    window.addEventListener('dragenter', (e) => {
+      e.preventDefault();
+      dragCounter++;
+      if (e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files')) {
+        dropOverlay.classList.remove('hidden');
+      }
+    });
+
+    window.addEventListener('dragover', (e) => e.preventDefault());
+
+    window.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      dragCounter = Math.max(0, dragCounter - 1);
+      if (dragCounter === 0) dropOverlay.classList.add('hidden');
+    });
+
+    window.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dragCounter = 0;
+      dropOverlay.classList.add('hidden');
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        processUploadedFiles(e.dataTransfer.files);
+      }
+    });
+
+    // Beim Start direkt die 10 Alpen-Beispielflüge laden
+    window.addEventListener('DOMContentLoaded', () => {
+      loadSampleFlights(true);
+    });
+  </script>
+</body>
+</html>
